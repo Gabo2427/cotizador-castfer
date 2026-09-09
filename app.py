@@ -4,7 +4,7 @@ from collections import Counter
 from logica_cotizador import Ventana, Puerta
 import db_manager
 
-st.set_page_config(page_title="Cotizador Casfer", page_icon="🪟", layout="wide")
+st.set_page_config(page_title="Cotizador CastFer", page_icon="🪟", layout="wide")
 db_manager.crear_tablas()
 
 st.markdown("""
@@ -29,71 +29,87 @@ if 'nombre_cliente' not in st.session_state:
     st.session_state.nombre_cliente = ""
 
 # ==========================================
-# BARRA LATERAL (FINANZAS Y PROYECTOS)
+# BARRA LATERAL (ROLES Y FINANZAS)
 # ==========================================
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/8201/8201402.png", width=80)
     st.title("📂 Control de Taller")
     
-    st.write("---")
-    st.subheader("💰 Finanzas del Proyecto")
-    st.session_state.nombre_cliente = st.text_input("Cliente / Proyecto:", value=st.session_state.nombre_cliente)
+    # SISTEMA DE LOGIN (PIN)
+    pin_acceso = st.text_input("🔑 PIN de Acceso:", type="password")
     
-    st.session_state.costo_total = st.number_input("Costo Total a Cobrar ($):", min_value=0.0, value=st.session_state.costo_total, step=100.0)
-    st.session_state.anticipo = st.number_input("Anticipo Recibido ($):", min_value=0.0, value=st.session_state.anticipo, step=100.0)
-    
-    restante = st.session_state.costo_total - st.session_state.anticipo
-    if restante > 0:
-        st.warning(f"Falta por cobrar: **${restante:,.2f}**")
-    elif st.session_state.costo_total > 0 and restante == 0:
-        st.success("¡TRABAJO LIQUIDADO! ✅")
+    if pin_acceso == "2026": # <-- Clave de tu papá
+        st.session_state.es_admin = True
+        st.success("Modo Administrador: Desbloqueado")
     else:
-        st.info(f"Falta por cobrar: **${restante:,.2f}**")
-    
-    st.write("---")
-    
-    # GUARDAR EL PROYECTO ACTUAL
-    if len(st.session_state.proyecto) > 0:
-        if st.button("💾 Guardar Trabajo", type="primary"):
-            if st.session_state.nombre_cliente.strip() == "":
-                st.error("Ponle un nombre para guardarlo.")
-            else:
-                if st.session_state.proyecto_activo_id:
-                    db_manager.actualizar_proyecto(st.session_state.proyecto_activo_id, st.session_state.nombre_cliente, st.session_state.proyecto, st.session_state.costo_total, st.session_state.anticipo)
-                else:
-                    db_manager.guardar_proyecto(st.session_state.nombre_cliente, st.session_state.proyecto, st.session_state.costo_total, st.session_state.anticipo)
-                st.success("¡Guardado correctamente!")
-    else:
-        st.info("Agrega piezas para poder guardar.")
+        st.session_state.es_admin = False
+        if pin_acceso != "":
+            st.error("PIN incorrecto. Modo Taller activo.")
+        else:
+            st.info("Modo Taller: Solo cortes y medidas.")
 
     st.write("---")
-    
-    # CARGAR PROYECTOS ANTERIORES
-    st.subheader("📁 Abrir Historial")
-    proyectos_guardados = db_manager.obtener_proyectos()
-    
-    if proyectos_guardados:
-        opciones_proyectos = {f"{p[1]} ({p[2][:10]})": p for p in proyectos_guardados}
-        seleccion = st.selectbox("Selecciona un proyecto:", list(opciones_proyectos.keys()))
+
+    # TODO ESTO SOLO SE MUESTRA SI ES ADMIN (TU PAPÁ)
+    if st.session_state.get('es_admin', False):
+        st.subheader("💰 Finanzas del Proyecto")
+        st.session_state.nombre_cliente = st.text_input("Cliente / Proyecto:", value=st.session_state.nombre_cliente)
         
-        col_abrir, col_borrar = st.columns(2)
-        with col_abrir:
-            if st.button("📂 Abrir"):
-                p_elegido = opciones_proyectos[seleccion]
-                st.session_state.proyecto_activo_id = p_elegido[0]
-                st.session_state.nombre_cliente = p_elegido[1]
-                st.session_state.proyecto = json.loads(p_elegido[3])
-                st.session_state.costo_total = float(p_elegido[4] if p_elegido[4] else 0.0)
-                st.session_state.anticipo = float(p_elegido[5] if p_elegido[5] else 0.0)
-                st.session_state.edit_index = None
-                st.rerun()
-        with col_borrar:
-            if st.button("🗑️ Borrar"):
-                db_manager.borrar_proyecto(opciones_proyectos[seleccion][0])
-                st.rerun()
+        st.session_state.costo_total = st.number_input("Costo Total a Cobrar ($):", min_value=0.0, value=st.session_state.costo_total, step=100.0)
+        st.session_state.anticipo = st.number_input("Anticipo Recibido ($):", min_value=0.0, value=st.session_state.anticipo, step=100.0)
+        
+        restante = st.session_state.costo_total - st.session_state.anticipo
+        if restante > 0:
+            st.warning(f"Falta por cobrar: **${restante:,.2f}**")
+        elif st.session_state.costo_total > 0 and restante == 0:
+            st.success("¡TRABAJO LIQUIDADO! ✅")
+        else:
+            st.info(f"Falta por cobrar: **${restante:,.2f}**")
+        
+        st.write("---")
+        
+        # Lógica de Guardado (Solo Admin)
+        if len(st.session_state.proyecto) > 0:
+            if st.button("💾 Guardar Trabajo", type="primary"):
+                if st.session_state.nombre_cliente.strip() == "":
+                    st.error("Ponle un nombre para guardarlo.")
+                else:
+                    if st.session_state.proyecto_activo_id:
+                        db_manager.actualizar_proyecto(st.session_state.proyecto_activo_id, st.session_state.nombre_cliente, st.session_state.proyecto, st.session_state.costo_total, st.session_state.anticipo)
+                    else:
+                        db_manager.guardar_proyecto(st.session_state.nombre_cliente, st.session_state.proyecto, st.session_state.costo_total, st.session_state.anticipo)
+                    st.success("¡Guardado correctamente!")
+        else:
+            st.info("Agrega piezas para poder guardar.")
 
+        st.write("---")
+        
+        # Lógica de Apertura de Historial (Solo Admin)
+        st.subheader("📁 Abrir Historial")
+        proyectos_guardados = db_manager.obtener_proyectos()
+        
+        if proyectos_guardados:
+            opciones_proyectos = {f"{p[1]} ({p[2][:10]})": p for p in proyectos_guardados}
+            # Se agrega una key única al selectbox para evitar conflictos si hay cambios de estado rápidos
+            seleccion = st.selectbox("Selecciona un proyecto:", list(opciones_proyectos.keys()), key="selector_historial")
+            
+            col_abrir, col_borrar = st.columns(2)
+            with col_abrir:
+                if st.button("📂 Abrir", key="btn_abrir"):
+                    p_elegido = opciones_proyectos[seleccion]
+                    st.session_state.proyecto_activo_id = p_elegido[0]
+                    st.session_state.nombre_cliente = p_elegido[1]
+                    st.session_state.proyecto = json.loads(p_elegido[3])
+                    st.session_state.costo_total = float(p_elegido[4] if p_elegido[4] else 0.0)
+                    st.session_state.anticipo = float(p_elegido[5] if p_elegido[5] else 0.0)
+                    st.session_state.edit_index = None
+                    st.rerun()
+            with col_borrar:
+                if st.button("🗑️ Borrar", key="btn_borrar"):
+                    db_manager.borrar_proyecto(opciones_proyectos[seleccion][0])
+                    st.rerun()
 
-st.title("🪟 Cotizador Aluminio CASFER")
+st.title("🪟 Cotizador Aluminio CASTFER")
 st.write("---")
 
 # ==========================================
@@ -404,7 +420,7 @@ else:
             st.header("📱 Exportar a WhatsApp")
             st.info("Haz clic en el ícono de las dos hojas (📋) en la esquina superior derecha para copiar.")
             
-            texto_wa = "🪟 *LISTA DE CORTES CASFER*\n\n"
+            texto_wa = "🪟 *LISTA DE CORTES CASTFER*\n\n"
             def txt_grupo_rastreo(nombre, lista_dicts):
                 if not lista_dicts: return ""
                 t = f"*{nombre}:*\n"
