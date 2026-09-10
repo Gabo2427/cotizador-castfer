@@ -32,7 +32,7 @@ if 'nombre_cliente' not in st.session_state:
 # BARRA LATERAL (ROLES Y FINANZAS)
 # ==========================================
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/8201/8201402.png", width=80)
+    st.image("logopagina.jpg", use_column_width=True)
     st.title("📂 Control de Taller")
     
     # SISTEMA DE LOGIN (PIN)
@@ -464,3 +464,4 @@ else:
             texto_wa += txt_grupo_rastreo("Vidrios Puerta", vidrios_puerta)
 
             st.code(texto_wa, language="markdown")
+            
