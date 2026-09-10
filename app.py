@@ -114,7 +114,9 @@ with st.sidebar:
                     db_manager.borrar_proyecto(seleccion[0])
                     st.rerun()
 
-st.title("🪟 Cotizador Aluminio CASTFER")
+col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
+with col_logo2:
+    st.image("logopagina.jpg", use_column_width=True)
 st.write("---")
 
 # ==========================================
