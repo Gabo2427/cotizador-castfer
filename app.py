@@ -32,7 +32,7 @@ if 'nombre_cliente' not in st.session_state:
 # BARRA LATERAL (ROLES Y FINANZAS)
 # ==========================================
 with st.sidebar:
-    st.image("logopagina.jpg", use_container_width=True)
+    st.image("logopagina.png", use_container_width=True)
     st.title("📂 Control de Taller")
     
     # SISTEMA DE LOGIN (PIN)
@@ -116,7 +116,7 @@ with st.sidebar:
 
 col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
 with col_logo2:
-    st.image("logopagina.jpg", use_container_width=True)
+    st.image("logopagina.png", use_container_width=True)
 st.write("---")
 
 # ==========================================
