@@ -38,7 +38,7 @@ with st.sidebar:
     # SISTEMA DE LOGIN (PIN)
     pin_acceso = st.text_input("🔑 PIN de Acceso:", type="password")
     
-    if pin_acceso == "2026": # <-- Clave de tu papá
+    if pin_acceso == "2026": 
         st.session_state.es_admin = True
         st.success("Modo Administrador: Desbloqueado")
     else:
@@ -50,7 +50,7 @@ with st.sidebar:
 
     st.write("---")
 
-    # TODO ESTO SOLO SE MUESTRA SI ES ADMIN (TU PAPÁ)
+    # TODO ESTO SOLO SE MUESTRA SI ES ADMIN
     if st.session_state.get('es_admin', False):
         st.subheader("💰 Finanzas del Proyecto")
         st.session_state.nombre_cliente = st.text_input("Cliente / Proyecto:", value=st.session_state.nombre_cliente)
@@ -84,29 +84,34 @@ with st.sidebar:
 
         st.write("---")
         
-        # Lógica de Apertura de Historial (Solo Admin)
+        # Lógica de Apertura de Historial (Solo Admin) - ¡CORREGIDA AQUÍ!
         st.subheader("📁 Abrir Historial")
         proyectos_guardados = db_manager.obtener_proyectos()
         
         if proyectos_guardados:
-            opciones_proyectos = {f"{p[1]} ({p[2][:10]})": p for p in proyectos_guardados}
-            # Se agrega una key única al selectbox para evitar conflictos si hay cambios de estado rápidos
-            seleccion = st.selectbox("Selecciona un proyecto:", list(opciones_proyectos.keys()), key="selector_historial")
+            # Pasamos la lista directa y le damos formato visual
+            seleccion = st.selectbox(
+                "Selecciona un proyecto:", 
+                options=proyectos_guardados,
+                format_func=lambda p: f"👤 {p[1]}  |  📅 {p[2][:10]}",
+                key="selector_historial"
+            )
             
             col_abrir, col_borrar = st.columns(2)
             with col_abrir:
                 if st.button("📂 Abrir", key="btn_abrir"):
-                    p_elegido = opciones_proyectos[seleccion]
-                    st.session_state.proyecto_activo_id = p_elegido[0]
-                    st.session_state.nombre_cliente = p_elegido[1]
-                    st.session_state.proyecto = json.loads(p_elegido[3])
-                    st.session_state.costo_total = float(p_elegido[4] if p_elegido[4] else 0.0)
-                    st.session_state.anticipo = float(p_elegido[5] if p_elegido[5] else 0.0)
+                    # Ahora 'seleccion' guarda el proyecto completo directamente
+                    st.session_state.proyecto_activo_id = seleccion[0]
+                    st.session_state.nombre_cliente = seleccion[1]
+                    st.session_state.proyecto = json.loads(seleccion[3])
+                    st.session_state.costo_total = float(seleccion[4] if seleccion[4] else 0.0)
+                    st.session_state.anticipo = float(seleccion[5] if seleccion[5] else 0.0)
                     st.session_state.edit_index = None
                     st.rerun()
             with col_borrar:
                 if st.button("🗑️ Borrar", key="btn_borrar"):
-                    db_manager.borrar_proyecto(opciones_proyectos[seleccion][0])
+                    # Borramos usando el ID de la selección directa
+                    db_manager.borrar_proyecto(seleccion[0])
                     st.rerun()
 
 st.title("🪟 Cotizador Aluminio CASTFER")
@@ -407,7 +412,7 @@ else:
             mostrar_optimizacion("Cabezal de Hoja", cortes_cabezal, ped_cabezal)
             mostrar_optimizacion("Zoclo", cortes_zoclo, ped_zoclo)
             
-            # Puertas (Aún no tienen pedacería, se mandan con texto vacío "")
+            # Puertas
             mostrar_optimizacion("Marco Puerta", cortes_marco_puerta, "")
             mostrar_optimizacion("Cerco Puerta", cortes_cerco_puerta, "")
             mostrar_optimizacion("Horizontales Puerta (Zoclo, Cabezal, Intermedio)", cortes_horizontales_puerta, "")
@@ -459,4 +464,3 @@ else:
             texto_wa += txt_grupo_rastreo("Vidrios Puerta", vidrios_puerta)
 
             st.code(texto_wa, language="markdown")
-            
