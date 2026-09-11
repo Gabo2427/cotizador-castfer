@@ -3,6 +3,9 @@ import json
 from collections import Counter
 from logica_cotizador import Ventana, Puerta
 import db_manager
+PIN_SECRETO = "2026"
+PREGUNTA_RECUPERACION = "¿Cómo se llamo el primer perro de la casa?"
+RESPUESTA_RECUPERACION = "titan" # Ponlo siempre en minúsculas
 
 st.set_page_config(page_title="Cotizador CastFer", page_icon="🪟", layout="wide")
 db_manager.crear_tablas()
@@ -35,23 +38,29 @@ with st.sidebar:
     st.image("logopagina.png", use_container_width=True)
     st.title("📂 Control de Taller")
     
-    # SISTEMA DE LOGIN (PIN)
-    pin_acceso = st.text_input("🔑 PIN de Acceso:", type="password")
-    
-    if pin_acceso == "2026": 
-        st.session_state.es_admin = True
-        st.success("Modo Administrador: Desbloqueado")
-    else:
-        st.session_state.es_admin = False
-        if pin_acceso != "":
-            st.error("PIN incorrecto. Modo Taller activo.")
-        else:
-            st.info("Modo Taller: Solo cortes y medidas.")
+    # Todo lo de abajo debe tener un "Tab" de espacio hacia la derecha
+    pin_ingresado = st.text_input("🔑 PIN de Acceso:", type="password")
 
+    if pin_ingresado == PIN_SECRETO:
+        st.session_state['admin'] = True
+        st.success("Modo Administrador activado")
+    elif pin_ingresado != "":
+        st.error("PIN incorrecto")
+
+    # Módulo de recuperación
+    if not st.session_state.get('admin', False):
+        with st.expander("¿Olvidaste el PIN?"):
+            st.markdown("Responde para ver el PIN:")
+            respuesta = st.text_input(PREGUNTA_RECUPERACION).lower().strip()
+            
+            if respuesta == RESPUESTA_RECUPERACION:
+                st.info(f"El PIN de acceso es: {PIN_SECRETO}")
+            elif respuesta != "":
+                st.error("Respuesta incorrecta")
     st.write("---")
 
     # TODO ESTO SOLO SE MUESTRA SI ES ADMIN
-    if st.session_state.get('es_admin', False):
+    if st.session_state.get('admin', False):
         st.subheader("💰 Finanzas del Proyecto")
         st.session_state.nombre_cliente = st.text_input("Cliente / Proyecto:", value=st.session_state.nombre_cliente)
         
