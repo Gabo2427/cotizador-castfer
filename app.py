@@ -3,9 +3,10 @@ import json
 from collections import Counter
 from logica_cotizador import Ventana, Puerta
 import db_manager
+
 PIN_SECRETO = "2026"
 PREGUNTA_RECUPERACION = "¿Cómo se llamo el primer perro de la casa?"
-RESPUESTA_RECUPERACION = "titan" # Ponlo siempre en minúsculas
+RESPUESTA_RECUPERACION = "titan" 
 
 st.set_page_config(page_title="Cotizador CastFer", page_icon="🪟", layout="wide")
 db_manager.crear_tablas()
@@ -32,20 +33,22 @@ if 'nombre_cliente' not in st.session_state:
     st.session_state.nombre_cliente = ""
 
 # ==========================================
-# BARRA LATERAL (ROLES Y FINANZAS)
+# BARRA LATERAL (ROLES Y GESTIÓN DE PROYECTOS)
 # ==========================================
 with st.sidebar:
     st.image("logopagina.png", use_container_width=True)
     st.title("📂 Control de Taller")
     
-    # Todo lo de abajo debe tener un "Tab" de espacio hacia la derecha
     pin_ingresado = st.text_input("🔑 PIN de Acceso:", type="password")
 
     if pin_ingresado == PIN_SECRETO:
         st.session_state['admin'] = True
         st.success("Modo Administrador activado")
     elif pin_ingresado != "":
+        st.session_state['admin'] = False
         st.error("PIN incorrecto")
+    elif pin_ingresado == "":
+        st.session_state['admin'] = False
 
     # Módulo de recuperación
     if not st.session_state.get('admin', False):
@@ -57,72 +60,62 @@ with st.sidebar:
                 st.info(f"El PIN de acceso es: {PIN_SECRETO}")
             elif respuesta != "":
                 st.error("Respuesta incorrecta")
+    
     st.write("---")
 
-    # TODO ESTO SOLO SE MUESTRA SI ES ADMIN
+    # ==========================================
+    # GUARDAR Y CARGAR PROYECTOS (OCULTO TRAS EL PIN)
+    # ==========================================
     if st.session_state.get('admin', False):
-        st.subheader("💰 Finanzas del Proyecto")
-        st.session_state.nombre_cliente = st.text_input("Cliente / Proyecto:", value=st.session_state.nombre_cliente)
+        st.subheader("💾 Gestión de Clientes")
+        st.session_state.nombre_cliente = st.text_input("Nombre del Cliente:", value=st.session_state.nombre_cliente)
         
-        st.session_state.costo_total = st.number_input("Costo Total a Cobrar ($):", min_value=0.0, value=st.session_state.costo_total, step=100.0)
-        st.session_state.anticipo = st.number_input("Anticipo Recibido ($):", min_value=0.0, value=st.session_state.anticipo, step=100.0)
-        
-        restante = st.session_state.costo_total - st.session_state.anticipo
-        if restante > 0:
-            st.warning(f"Falta por cobrar: **${restante:,.2f}**")
-        elif st.session_state.costo_total > 0 and restante == 0:
-            st.success("¡TRABAJO LIQUIDADO! ✅")
-        else:
-            st.info(f"Falta por cobrar: **${restante:,.2f}**")
-        
-        st.write("---")
-        
-        # Lógica de Guardado (Solo Admin)
-        if len(st.session_state.proyecto) > 0:
-            if st.button("💾 Guardar Trabajo", type="primary"):
-                if st.session_state.nombre_cliente.strip() == "":
-                    st.error("Ponle un nombre para guardarlo.")
-                else:
-                    if st.session_state.proyecto_activo_id:
-                        db_manager.actualizar_proyecto(st.session_state.proyecto_activo_id, st.session_state.nombre_cliente, st.session_state.proyecto, st.session_state.costo_total, st.session_state.anticipo)
-                    else:
-                        db_manager.guardar_proyecto(st.session_state.nombre_cliente, st.session_state.proyecto, st.session_state.costo_total, st.session_state.anticipo)
-                    st.success("¡Guardado correctamente!")
-        else:
-            st.info("Agrega piezas para poder guardar.")
+        if st.button("Guardar Proyecto en Historial", use_container_width=True):
+            if st.session_state.nombre_cliente == "":
+                st.warning("⚠️ Ingresa el nombre del cliente arriba.")
+            elif len(st.session_state.proyecto) == 0:
+                st.warning("⚠️ No hay piezas para guardar.")
+            else:
+                db_manager.guardar_proyecto(
+                    st.session_state.nombre_cliente, 
+                    st.session_state.proyecto,
+                    st.session_state.costo_total,
+                    st.session_state.anticipo
+                )
+                st.success(f"¡Proyecto de {st.session_state.nombre_cliente} guardado con éxito!")
 
-        st.write("---")
-        
-        # Lógica de Apertura de Historial (Solo Admin) - ¡CORREGIDA AQUÍ!
-        st.subheader("📁 Abrir Historial")
+# Cargar o borrar proyectos anteriores
         proyectos_guardados = db_manager.obtener_proyectos()
-        
         if proyectos_guardados:
-            # Pasamos la lista directa y le damos formato visual
-            seleccion = st.selectbox(
-                "Selecciona un proyecto:", 
-                options=proyectos_guardados,
-                format_func=lambda p: f"👤 {p[1]}  |  📅 {p[2][:10]}",
-                key="selector_historial"
-            )
+            st.write("")
+            st.markdown("**Historial de cotizaciones:**")
+            opciones = {p[0]: f"{p[1]} ({p[2]})" for p in proyectos_guardados}
+            seleccion = st.selectbox("Selecciona un proyecto:", options=list(opciones.keys()), format_func=lambda x: opciones[x])
             
-            col_abrir, col_borrar = st.columns(2)
-            with col_abrir:
-                if st.button("📂 Abrir", key="btn_abrir"):
-                    # Ahora 'seleccion' guarda el proyecto completo directamente
-                    st.session_state.proyecto_activo_id = seleccion[0]
-                    st.session_state.nombre_cliente = seleccion[1]
-                    st.session_state.proyecto = json.loads(seleccion[3])
-                    st.session_state.costo_total = float(seleccion[4] if seleccion[4] else 0.0)
-                    st.session_state.anticipo = float(seleccion[5] if seleccion[5] else 0.0)
-                    st.session_state.edit_index = None
-                    st.rerun()
+            col_cargar, col_borrar = st.columns(2)
+            with col_cargar:
+                if st.button("📂 Cargar", use_container_width=True):
+                  proyecto_cargado = next((p for p in proyectos_guardados if p[0] == seleccion), None)
+                  if proyecto_cargado:
+                      st.session_state.proyecto_activo_id = proyecto_cargado[0]
+                      st.session_state.nombre_cliente = proyecto_cargado[1]
+                      st.session_state.proyecto = json.loads(proyecto_cargado[3])
+                      
+                      # NUEVO: Cargar el anticipo guardado
+                      try:
+                          st.session_state.anticipo = float(proyecto_cargado[5])
+                      except IndexError:
+                          st.session_state.anticipo = 0.0
+                          
+                      st.rerun()
             with col_borrar:
-                if st.button("🗑️ Borrar", key="btn_borrar"):
-                    # Borramos usando el ID de la selección directa
-                    db_manager.borrar_proyecto(seleccion[0])
+                if st.button("🗑️ Borrar", use_container_width=True):
+                    db_manager.borrar_proyecto(seleccion)
                     st.rerun()
 
+# ==========================================
+# LOGO Y ENCABEZADO PRINCIPAL
+# ==========================================
 col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
 with col_logo2:
     st.image("logopagina.png", use_container_width=True)
@@ -219,7 +212,138 @@ else:
                 st.rerun()
                 
     st.write("---")
-    
+
+    # ==========================================
+    # SECCIÓN 3: FINANZAS (MODO ADMIN)
+    # ==========================================
+    if st.session_state.get('admin', False):
+        st.subheader("💰 Finanzas del Proyecto")
+        st.markdown("**Ingresa el precio final (material e instalación) por cada pieza:**")
+        
+        total_proyecto = 0.0
+        
+        for i, pieza in enumerate(st.session_state.proyecto):
+            col_texto, col_precio = st.columns([3, 1])
+            
+            with col_texto:
+                st.markdown(f"<br>**Pieza {i+1}:** {pieza['tipo']} ({round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm) - Línea {pieza['detalle']}", unsafe_allow_html=True)
+            
+            with col_precio:
+                # Leemos si la pieza ya tenía un precio guardado, si no, arranca en 0.0
+                precio_actual = pieza.get('precio', 0.0)
+                precio_pieza = st.number_input("Precio ($)", min_value=0.0, step=100.0, value=float(precio_actual), format="%.2f", key=f"precio_{i}")
+                
+                # ¡EL CEREBRO DEL COTIZADOR! Guardamos el precio exacto dentro de la pieza
+                st.session_state.proyecto[i]['precio'] = precio_pieza
+                total_proyecto += precio_pieza
+        
+        # ¡AQUÍ ESTÁ LA LÍNEA NUEVA YA INTEGRADA! (Esta no se borra)
+        st.session_state.costo_total = total_proyecto
+        
+        st.write("---")
+        
+        col_total, col_sugerido = st.columns(2)
+        with col_total:
+            st.metric("Total Cotizado:", f"${total_proyecto:,.2f}")
+        with col_sugerido:
+            st.metric("Anticipo Sugerido (50%):", f"${(total_proyecto / 2):,.2f}")
+            
+        st.write("")
+        
+        st.markdown("**Control de Pagos:**")
+        col_anticipo, col_restante = st.columns(2)
+        
+        # --- LÓGICA COMBINADA (ESTADO PRIVADO + BLOQUEO FÍSICO) ---
+        valor_protegido = float(st.session_state.get('anticipo', 0.0))
+        ya_hay_anticipo = valor_protegido > 0
+        
+        with col_anticipo:
+            anticipo_real = st.number_input(
+                "Anticipo entregado por el cliente ($)", 
+                min_value=0.0, 
+                step=100.0, 
+                value=valor_protegido,
+                disabled=ya_hay_anticipo  # Candado físico silencioso
+            )
+            # Actualizamos el estado privado
+            st.session_state.anticipo = anticipo_real
+                
+        with col_restante:
+            saldo_pendiente = total_proyecto - st.session_state.anticipo
+            st.metric("Saldo Pendiente (A liquidar):", f"${saldo_pendiente:,.2f}")
+        
+        st.write("")
+        # Botón para generar el recibo PDF
+        if st.button("📄 Generar Recibo en PDF", type="primary", use_container_width=True):
+            try:
+                from fpdf import FPDF
+                import base64
+                from datetime import datetime
+
+                # 1. Crear el documento
+                pdf = FPDF()
+                pdf.add_page()
+                
+                # 2. Agregar Logo de CASTFER
+                try:
+                    pdf.image("logopagina.png", x=10, y=8, w=45)
+                except:
+                    pass # Si no encuentra la imagen temporalmente, no se rompe
+                
+                # 3. Encabezado y Datos
+                pdf.set_font("Arial", 'B', 16)
+                pdf.cell(0, 10, "Cotizacion de Proyecto", ln=True, align='R')
+                pdf.set_font("Arial", '', 12)
+                fecha_actual = datetime.now().strftime("%d/%m/%Y")
+                pdf.cell(0, 10, f"Fecha: {fecha_actual}", ln=True, align='R')
+                
+                pdf.ln(15) # Espacio en blanco
+                
+                pdf.set_font("Arial", 'B', 12)
+                cliente_pdf = st.session_state.nombre_cliente if st.session_state.nombre_cliente else "Cliente General"
+                pdf.cell(0, 10, f"Cliente: {cliente_pdf}", ln=True)
+                pdf.ln(5)
+                
+                # 4. Tabla de Piezas y Precios
+                pdf.set_font("Arial", '', 10)
+                for i, pieza in enumerate(st.session_state.proyecto):
+                    # Usamos texto sin acentos para la compatibilidad del PDF
+                    texto_pieza = f"Pieza {i+1}: {pieza['tipo']} - {pieza['detalle']} ({round(pieza['ancho']*100,1)} x {round(pieza['alto']*100,1)} cm)"
+                    precio_ind = st.session_state.get(f"precio_{i}", 0.0)
+                    
+                    pdf.cell(140, 8, texto_pieza, border=1)
+                    pdf.cell(50, 8, f"${precio_ind:,.2f}", border=1, ln=True, align='R')
+                
+                # 5. Totales
+                pdf.ln(5)
+                pdf.set_font("Arial", 'B', 11)
+                pdf.cell(140, 8, "Total Cotizado:", border=0, align='R')
+                pdf.cell(50, 8, f"${st.session_state.costo_total:,.2f}", border=1, ln=True, align='R')
+                
+                pdf.cell(140, 8, "Anticipo Recibido:", border=0, align='R')
+                pdf.cell(50, 8, f"${st.session_state.anticipo:,.2f}", border=1, ln=True, align='R')
+                
+                pdf.set_font("Arial", 'B', 12)
+                saldo_final = st.session_state.costo_total - st.session_state.anticipo
+                pdf.cell(140, 8, "Saldo Pendiente:", border=0, align='R')
+                pdf.cell(50, 8, f"${saldo_final:,.2f}", border=1, ln=True, align='R')
+
+                # 6. Generar archivo descargable
+                pdf_bytes = pdf.output(dest='S').encode('latin-1')
+                b64 = base64.b64encode(pdf_bytes).decode()
+                href = f'<a href="data:application/pdf;base64,{b64}" download="Cotizacion_CASTFER_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #ff4b4b; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">📥 Descargar PDF para enviar por WhatsApp</a>'
+                
+                st.markdown(href, unsafe_allow_html=True)
+                st.balloons() # Pequeña animación de éxito
+
+            except ImportError:
+                st.error("⚠️ Falta instalar la librería para PDFs. Ve a tu terminal y escribe: pip install fpdf")
+        
+        st.write("---")
+
+    # ==========================================
+    # SECCIÓN 4: OPTIMIZACIÓN (TALLER)
+    # ==========================================
     with st.expander("♻️ ¿Tienes pedacería en el taller? (Opcional)"):
         st.info("Ingresa la medida de tus recortes en centímetros, separados por comas. Si no tienes, déjalo en blanco.")
         col_p1, col_p2 = st.columns(2)
@@ -475,4 +599,5 @@ else:
             texto_wa += txt_grupo_rastreo("Vidrios Puerta", vidrios_puerta)
 
             st.code(texto_wa, language="markdown")
+
             
