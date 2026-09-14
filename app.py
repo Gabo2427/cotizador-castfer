@@ -449,7 +449,8 @@ else:
                 pdf.set_font("Arial", '', 10)
                 if lista_medidas:
                     # Unimos todas las medidas con un puntito chido separador
-                    texto_medidas = "  •  ".join(lista_medidas)
+                    # Unimos todas las medidas con una barra separadora (carácter compatible)
+                    texto_medidas = "   |   ".join(lista_medidas)
                     # Usamos multi_cell para que el texto baje de renglón automáticamente sin salirse de la hoja
                     pdf.multi_cell(0, 6, texto_medidas)
                 
