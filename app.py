@@ -84,7 +84,7 @@ with st.sidebar:
                 )
                 st.success(f"¡Proyecto de {st.session_state.nombre_cliente} guardado con éxito!")
 
-# Cargar o borrar proyectos anteriores
+        # Cargar o borrar proyectos anteriores
         proyectos_guardados = db_manager.obtener_proyectos()
         if proyectos_guardados:
             st.write("")
@@ -95,19 +95,18 @@ with st.sidebar:
             col_cargar, col_borrar = st.columns(2)
             with col_cargar:
                 if st.button("📂 Cargar", use_container_width=True):
-                  proyecto_cargado = next((p for p in proyectos_guardados if p[0] == seleccion), None)
-                  if proyecto_cargado:
-                      st.session_state.proyecto_activo_id = proyecto_cargado[0]
-                      st.session_state.nombre_cliente = proyecto_cargado[1]
-                      st.session_state.proyecto = json.loads(proyecto_cargado[3])
-                      
-                      # NUEVO: Cargar el anticipo guardado
-                      try:
-                          st.session_state.anticipo = float(proyecto_cargado[5])
-                      except IndexError:
-                          st.session_state.anticipo = 0.0
-                          
-                      st.rerun()
+                    proyecto_cargado = next((p for p in proyectos_guardados if p[0] == seleccion), None)
+                    if proyecto_cargado:
+                        st.session_state.proyecto_activo_id = proyecto_cargado[0]
+                        st.session_state.nombre_cliente = proyecto_cargado[1]
+                        st.session_state.proyecto = json.loads(proyecto_cargado[3])
+                        
+                        try:
+                            st.session_state.anticipo = float(proyecto_cargado[5])
+                        except IndexError:
+                            st.session_state.anticipo = 0.0
+                            
+                        st.rerun()
             with col_borrar:
                 if st.button("🗑️ Borrar", use_container_width=True):
                     db_manager.borrar_proyecto(seleccion)
@@ -229,15 +228,12 @@ else:
                 st.markdown(f"<br>**Pieza {i+1}:** {pieza['tipo']} ({round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm) - Línea {pieza['detalle']}", unsafe_allow_html=True)
             
             with col_precio:
-                # Leemos si la pieza ya tenía un precio guardado, si no, arranca en 0.0
                 precio_actual = pieza.get('precio', 0.0)
                 precio_pieza = st.number_input("Precio ($)", min_value=0.0, step=100.0, value=float(precio_actual), format="%.2f", key=f"precio_{i}")
                 
-                # ¡EL CEREBRO DEL COTIZADOR! Guardamos el precio exacto dentro de la pieza
                 st.session_state.proyecto[i]['precio'] = precio_pieza
                 total_proyecto += precio_pieza
         
-        # ¡AQUÍ ESTÁ LA LÍNEA NUEVA YA INTEGRADA! (Esta no se borra)
         st.session_state.costo_total = total_proyecto
         
         st.write("---")
@@ -253,7 +249,6 @@ else:
         st.markdown("**Control de Pagos:**")
         col_anticipo, col_restante = st.columns(2)
         
-        # --- LÓGICA COMBINADA (ESTADO PRIVADO + BLOQUEO FÍSICO) ---
         valor_protegido = float(st.session_state.get('anticipo', 0.0))
         ya_hay_anticipo = valor_protegido > 0
         
@@ -263,9 +258,8 @@ else:
                 min_value=0.0, 
                 step=100.0, 
                 value=valor_protegido,
-                disabled=ya_hay_anticipo  # Candado físico silencioso
+                disabled=ya_hay_anticipo
             )
-            # Actualizamos el estado privado
             st.session_state.anticipo = anticipo_real
                 
         with col_restante:
@@ -273,48 +267,45 @@ else:
             st.metric("Saldo Pendiente (A liquidar):", f"${saldo_pendiente:,.2f}")
         
         st.write("")
-        # Botón para generar el recibo PDF
+        
+        # ==========================================
+        # BOTÓN 1: RECIBO CLIENTE
+        # ==========================================
         if st.button("📄 Generar Recibo en PDF", type="primary", use_container_width=True):
             try:
                 from fpdf import FPDF
                 import base64
                 from datetime import datetime
 
-                # 1. Crear el documento
                 pdf = FPDF()
                 pdf.add_page()
                 
-                # 2. Agregar Logo de CASTFER
                 try:
                     pdf.image("logopagina.png", x=10, y=8, w=45)
                 except:
-                    pass # Si no encuentra la imagen temporalmente, no se rompe
+                    pass 
                 
-                # 3. Encabezado y Datos
                 pdf.set_font("Arial", 'B', 16)
                 pdf.cell(0, 10, "Cotizacion de Proyecto", ln=True, align='R')
                 pdf.set_font("Arial", '', 12)
                 fecha_actual = datetime.now().strftime("%d/%m/%Y")
                 pdf.cell(0, 10, f"Fecha: {fecha_actual}", ln=True, align='R')
                 
-                pdf.ln(15) # Espacio en blanco
+                pdf.ln(15) 
                 
                 pdf.set_font("Arial", 'B', 12)
                 cliente_pdf = st.session_state.nombre_cliente if st.session_state.nombre_cliente else "Cliente General"
                 pdf.cell(0, 10, f"Cliente: {cliente_pdf}", ln=True)
                 pdf.ln(5)
                 
-                # 4. Tabla de Piezas y Precios
                 pdf.set_font("Arial", '', 10)
                 for i, pieza in enumerate(st.session_state.proyecto):
-                    # Usamos texto sin acentos para la compatibilidad del PDF
                     texto_pieza = f"Pieza {i+1}: {pieza['tipo']} - {pieza['detalle']} ({round(pieza['ancho']*100,1)} x {round(pieza['alto']*100,1)} cm)"
                     precio_ind = st.session_state.get(f"precio_{i}", 0.0)
                     
                     pdf.cell(140, 8, texto_pieza, border=1)
                     pdf.cell(50, 8, f"${precio_ind:,.2f}", border=1, ln=True, align='R')
                 
-                # 5. Totales
                 pdf.ln(5)
                 pdf.set_font("Arial", 'B', 11)
                 pdf.cell(140, 8, "Total Cotizado:", border=0, align='R')
@@ -328,17 +319,133 @@ else:
                 pdf.cell(140, 8, "Saldo Pendiente:", border=0, align='R')
                 pdf.cell(50, 8, f"${saldo_final:,.2f}", border=1, ln=True, align='R')
 
-                # 6. Generar archivo descargable
                 pdf_bytes = pdf.output(dest='S').encode('latin-1')
                 b64 = base64.b64encode(pdf_bytes).decode()
                 href = f'<a href="data:application/pdf;base64,{b64}" download="Cotizacion_CASTFER_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #ff4b4b; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">📥 Descargar PDF para enviar por WhatsApp</a>'
                 
                 st.markdown(href, unsafe_allow_html=True)
-                st.balloons() # Pequeña animación de éxito
+                st.balloons() 
 
-            except ImportError:
+            except Exception as e:
                 st.error("⚠️ Falta instalar la librería para PDFs. Ve a tu terminal y escribe: pip install fpdf")
         
+        st.write("---")
+
+        # ==========================================
+        # BOTÓN 2: LISTA DE MATERIALES PARA PROVEEDOR (NUEVO DISEÑO PROFESIONAL)
+        # ==========================================
+        if st.button("🛒 Generar Lista de Materiales (PDF)", type="secondary", use_container_width=True):
+            try:
+                from fpdf import FPDF
+                import base64
+                import math
+                from datetime import datetime
+                from logica_cotizador import Ventana
+
+                tot_chambrana = tot_riel = tot_cerco = tot_traslape = tot_cabezal = tot_zoclo = tot_vinil = 0.0
+                num_ventanas = 0
+
+                for p in st.session_state.proyecto:
+                    if p['tipo'] == "Ventana Corrediza":
+                        num_ventanas += 1
+                        v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco")
+                        a_m, alt_l = v.calcular_cortes_marco()
+                        alt_f, a_h = v.calcular_hoja_fija()
+                        alt_c, _ = v.calcular_hoja_corrediza()
+                        a_vf, alt_vf, _ = v.calcular_vidrio(alt_f, a_h)
+                        a_vc, alt_vc, _ = v.calcular_vidrio(alt_c, a_h)
+                        
+                        tot_chambrana += (alt_l * 2 + a_m) * 100
+                        tot_riel += (a_m) * 100
+                        tot_cerco += (alt_f + alt_c) * 100
+                        tot_traslape += (alt_f + alt_c) * 100
+                        tot_cabezal += (a_h * 2) * 100
+                        tot_zoclo += (a_h * 2) * 100
+                        
+                        luz_ancho = (a_h * 100) - 10.0
+                        luz_alto_f = (alt_f * 100) - 9.0
+                        luz_alto_c = (alt_c * 100) - 9.0
+                        
+                        tot_vinil += ((luz_ancho + luz_alto_f) * 2) + ((luz_ancho + luz_alto_c) * 2)
+
+                # --- CREACIÓN DEL PDF PROFESIONAL ---
+                pdf = FPDF()
+                pdf.add_page()
+                
+                try:
+                    pdf.image("logopagina.png", x=10, y=8, w=45)
+                except:
+                    pass 
+                
+                pdf.set_font("Arial", 'B', 16)
+                pdf.cell(0, 8, "ORDEN DE MATERIALES - TALLER", ln=True, align='R')
+                
+                pdf.set_font("Arial", '', 11)
+                fecha_actual = datetime.now().strftime("%d/%m/%Y")
+                pdf.cell(0, 6, f"Fecha de emision: {fecha_actual}", ln=True, align='R')
+                
+                cliente_pdf = st.session_state.nombre_cliente if st.session_state.nombre_cliente else "Proyecto General"
+                pdf.cell(0, 6, f"Cliente / Proyecto: {cliente_pdf}", ln=True, align='R')
+                
+                pdf.ln(8)
+                pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+                pdf.ln(8)
+
+                # --- SECCIÓN PERFILES ---
+                pdf.set_font("Arial", 'B', 12)
+                pdf.set_fill_color(235, 235, 235)
+                pdf.cell(0, 8, " 1. PERFILES DE ALUMINIO (Tiras de 6 metros)", ln=True, fill=True)
+                pdf.ln(4)
+                
+                pdf.set_font("Arial", '', 11)
+
+                def agregar_perfil(nombre, total_cm):
+                    if total_cm > 0:
+                        tiras = math.ceil(total_cm / 600.0)
+                        pdf.cell(0, 8, f"[   ]   {tiras} {nombre} de 6 mts   (Total neto requerido: {round(total_cm)} cms)", ln=True)
+
+                agregar_perfil("Chambranas", tot_chambrana)
+                agregar_perfil("Rieles", tot_riel)
+                agregar_perfil("Cercos", tot_cerco)
+                agregar_perfil("Traslapes", tot_traslape)
+                agregar_perfil("Cabezales", tot_cabezal)
+                agregar_perfil("Zoclos", tot_zoclo)
+
+                pdf.ln(6)
+
+                # --- SECCIÓN HERRAJES ---
+                pdf.set_font("Arial", 'B', 12)
+                pdf.cell(0, 8, " 2. HERRAJES Y ACCESORIOS", ln=True, fill=True)
+                pdf.ln(4)
+                
+                pdf.set_font("Arial", '', 11)
+                
+                if num_ventanas > 0:
+                    pdf.cell(0, 8, f"[   ]   {num_ventanas} Jaladeras", ln=True)
+                    pdf.cell(0, 8, f"[   ]   {num_ventanas * 2} Carretillas", ln=True)
+                    pdf.cell(0, 8, f"[   ]   {num_ventanas} Botes de Sellador", ln=True)
+                    
+                    metros_vinil = math.ceil(tot_vinil / 100.0)
+                    pdf.cell(0, 8, f"[   ]   {metros_vinil} Metros lineales de Vinil perimetral", ln=True)
+                else:
+                    pdf.cell(0, 8, "No se registraron ventanas en este proyecto.", ln=True)
+
+                pdf.ln(15)
+                pdf.set_font("Arial", 'I', 9)
+                pdf.set_text_color(100, 100, 100)
+                pdf.cell(0, 5, "Nota: El calculo de perfiles ha sido redondeado a piezas enteras de 6m para facilitar la compra.", ln=True, align='C')
+
+                # Botón de Descarga
+                pdf_bytes = pdf.output(dest='S').encode('latin-1')
+                b64 = base64.b64encode(pdf_bytes).decode()
+                href = f'<a href="data:application/pdf;base64,{b64}" download="Compras_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #28a745; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>'
+                
+                st.write("")
+                st.markdown(href, unsafe_allow_html=True)
+                
+            except Exception as e:
+                st.error(f"Error generando el PDF: {e}")
+                
         st.write("---")
 
     # ==========================================
@@ -367,14 +474,12 @@ else:
             "📱 Exportar a WhatsApp"
         ])
         
-        # Diccionarios de rastreo para ventanas
         cortes_chambrana, cortes_riel, cortes_cerco, cortes_traslape, cortes_cabezal, cortes_zoclo = [], [], [], [], [], []
         vidrios_fijos, vidrios_corredizos = [], []
 
-        # Diccionarios de rastreo para Puertas
         cortes_marco_puerta = [] 
         cortes_cerco_puerta = []
-        cortes_horizontales_puerta = [] # Cabezal, Zoclo, Intermedio
+        cortes_horizontales_puerta = [] 
         cortes_duela_puerta = []
         vidrios_puerta = []
         
@@ -413,18 +518,13 @@ else:
                 cerco_hoja, horizontales_hoja = puerta.calcular_cortes_hoja()
                 ancho_r, alto_r, cant_duelas = puerta.calcular_relleno()
                 
-                # Cortes Marco
                 agregar_cortes_con_rastreo(cortes_marco_puerta, [round(laterales_marco*100, 1), round(laterales_marco*100, 1)], f"Marco-L{num_pieza}")
                 agregar_cortes_con_rastreo(cortes_marco_puerta, [round(cabezal_marco*100, 1)], f"Marco-C{num_pieza}")
                 
-                # Cortes Hoja
                 agregar_cortes_con_rastreo(cortes_cerco_puerta, [round(cerco_hoja*100, 1), round(cerco_hoja*100, 1)], f"Hoja-L{num_pieza}")
-                # Zoclo, Cabezal hoja e Intermedio
                 agregar_cortes_con_rastreo(cortes_horizontales_puerta, [round(horizontales_hoja*100, 1), round(horizontales_hoja*100, 1), round(horizontales_hoja*100, 1)], f"Hoja-Horiz-P{num_pieza}")
                 
-                # Relleno (Vidrio y Duelas)
                 vidrios_puerta.append({"medida": f"{round(ancho_r*100, 1)} x {round(alto_r*100, 1)}", "etiqueta": f"Vidrio-P{num_pieza}"})
-                # Generamos las piezas de duela multiplicadas por la cantidad requerida
                 cortes_duela = [round(ancho_r*100, 1)] * cant_duelas
                 agregar_cortes_con_rastreo(cortes_duela_puerta, cortes_duela, f"Duela-P{num_pieza}")
 
@@ -599,5 +699,4 @@ else:
             texto_wa += txt_grupo_rastreo("Vidrios Puerta", vidrios_puerta)
 
             st.code(texto_wa, language="markdown")
-
             
