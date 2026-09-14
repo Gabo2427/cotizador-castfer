@@ -334,6 +334,9 @@ else:
         # ==========================================
         # BOTÓN 2: LISTA DE MATERIALES PARA PROVEEDOR (NUEVO DISEÑO PROFESIONAL)
         # ==========================================
+        # ==========================================
+        # BOTÓN 2: LISTA DE MATERIALES PARA PROVEEDOR (NUEVO DISEÑO PROFESIONAL)
+        # ==========================================
         if st.button("🛒 Generar Lista de Materiales (PDF)", type="secondary", use_container_width=True):
             try:
                 from fpdf import FPDF
@@ -344,8 +347,15 @@ else:
 
                 tot_chambrana = tot_riel = tot_cerco = tot_traslape = tot_cabezal = tot_zoclo = tot_vinil = 0.0
                 num_ventanas = 0
+                
+                # NUEVO: Lista para guardar las medidas de forma compacta
+                lista_medidas = []
 
-                for p in st.session_state.proyecto:
+                for i, p in enumerate(st.session_state.proyecto):
+                    # Guardamos la medida de cada pieza para imprimirla al final
+                    texto_medida = f"P{i+1}: {round(p['ancho']*100,1)}x{round(p['alto']*100,1)}cm"
+                    lista_medidas.append(texto_medida)
+
                     if p['tipo'] == "Ventana Corrediza":
                         num_ventanas += 1
                         v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco")
@@ -389,7 +399,7 @@ else:
                 
                 pdf.ln(8)
                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-                pdf.ln(8)
+                pdf.ln(5) # Reduje un poco el espacio para asegurar que quepa en 1 hoja
 
                 # --- SECCIÓN PERFILES ---
                 pdf.set_font("Arial", 'B', 12)
@@ -411,7 +421,7 @@ else:
                 agregar_perfil("Cabezales", tot_cabezal)
                 agregar_perfil("Zoclos", tot_zoclo)
 
-                pdf.ln(6)
+                pdf.ln(4)
 
                 # --- SECCIÓN HERRAJES ---
                 pdf.set_font("Arial", 'B', 12)
@@ -430,7 +440,21 @@ else:
                 else:
                     pdf.cell(0, 8, "No se registraron ventanas en este proyecto.", ln=True)
 
-                pdf.ln(15)
+                # --- SECCIÓN 3: RESUMEN DE MEDIDAS ---
+                pdf.ln(6)
+                pdf.set_font("Arial", 'B', 12)
+                pdf.cell(0, 8, " 3. RESUMEN DE MEDIDAS (Ancho x Alto)", ln=True, fill=True)
+                pdf.ln(4)
+                
+                pdf.set_font("Arial", '', 10)
+                if lista_medidas:
+                    # Unimos todas las medidas con un puntito chido separador
+                    texto_medidas = "  •  ".join(lista_medidas)
+                    # Usamos multi_cell para que el texto baje de renglón automáticamente sin salirse de la hoja
+                    pdf.multi_cell(0, 6, texto_medidas)
+                
+                # --- NOTA FINAL ---
+                pdf.ln(8)
                 pdf.set_font("Arial", 'I', 9)
                 pdf.set_text_color(100, 100, 100)
                 pdf.cell(0, 5, "Nota: El calculo de perfiles ha sido redondeado a piezas enteras de 6m para facilitar la compra.", ln=True, align='C')
@@ -699,4 +723,3 @@ else:
             texto_wa += txt_grupo_rastreo("Vidrios Puerta", vidrios_puerta)
 
             st.code(texto_wa, language="markdown")
-            
