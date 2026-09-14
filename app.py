@@ -412,8 +412,10 @@ else:
                 def agregar_perfil(nombre, total_cm):
                     if total_cm > 0:
                         tiras = math.ceil(total_cm / 600.0)
-                        pdf.cell(0, 8, f"[   ]   {tiras} {nombre} de 6 mts   (Total neto requerido: {round(total_cm)} cms)", ln=True)
-
+                        # Convertimos los centímetros a metros (dividiendo entre 100) y dejamos 2 decimales
+                        total_mts = round(total_cm / 100.0, 2)
+                        pdf.cell(0, 8, f"[   ]   {tiras} {nombre} de 6 mts   (Total neto requerido: {total_mts} mts)", ln=True)
+                        
                 agregar_perfil("Chambranas", tot_chambrana)
                 agregar_perfil("Rieles", tot_riel)
                 agregar_perfil("Cercos", tot_cerco)
