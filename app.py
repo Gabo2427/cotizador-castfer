@@ -3,6 +3,8 @@ import json
 from collections import Counter
 from logica_cotizador import Ventana, Puerta
 import db_manager
+import math
+from datetime import datetime
 
 PIN_SECRETO = "2026"
 PREGUNTA_RECUPERACION = "¿Cómo se llamo el primer perro de la casa?"
@@ -69,114 +71,87 @@ def optimizador_inteligente(cortes_num, pedaceria_str, tramo_ideal=600.0):
             
     return tramos_nuevos, uso_ped
 
-# --- MOTOR DE VIDRIO CON EVALUADOR DE 4 ESCENARIOS ---
-        def optimizador_vidrio(vidrios_list, pedaceria_str):
-            pedaceria = []
-            if pedaceria_str.strip():
-                for t in pedaceria_str.split(','):
-                    try:
-                        w, h = [float(x.strip()) for x in t.lower().split('x')]
-                        pedaceria.append({"w": w, "h": h, "usado": False, "original": t})
-                    except: pass
+# --- MOTOR DE VIDRIO AVANZADO CON ROTACIÓN Y 4 ESCENARIOS ---
+def optimizador_vidrio(vidrios_list, pedaceria_str):
+    pedaceria = []
+    if pedaceria_str.strip():
+        for t in pedaceria_str.split(','):
+            try:
+                w, h = [float(x.strip()) for x in t.lower().split('x')]
+                pedaceria.append({"w": w, "h": h, "usado": False, "original": t})
+            except: pass
+    
+    piezas_exactas = []
+    piezas_reducidas = []
+    
+    for v in vidrios_list:
+        try:
+            w, h = [float(x.strip()) for x in v['medida'].lower().split('x')]
+            piezas_exactas.append({"w": round(w, 1), "h": round(h, 1), "etiqueta": v['etiqueta'], "original": v['medida']})
+            # Reducción de 0.5 por lado (1 cm total)
+            piezas_reducidas.append({"w": round(w - 1.0, 1), "h": round(h - 1.0, 1), "etiqueta": v['etiqueta'], "original": v['medida']})
+        except: pass
+        
+    piezas_rescatadas = []
+    pendientes_exactas = []
+    pendientes_reducidas = []
+    
+    # 1. Rescatar de pedacería primero
+    for i in range(len(piezas_exactas)):
+        p_ex = piezas_exactas[i]
+        p_red = piezas_reducidas[i]
+        colocado = False
+        for ped in pedaceria:
+            if not ped["usado"]:
+                if (p_ex["w"] <= ped["w"] and p_ex["h"] <= ped["h"]) or (p_ex["w"] <= ped["h"] and p_ex["h"] <= ped["w"]):
+                    ped["usado"] = True
+                    piezas_rescatadas.append({"pieza": p_ex, "pedazo": ped})
+                    colocado = True
+                    break
+        if not colocado:
+            pendientes_exactas.append(p_ex)
+            pendientes_reducidas.append(p_red)
             
-            piezas_exactas = []
-            piezas_reducidas = []
-            
-            for v in vidrios_list:
-                try:
-                    w, h = [float(x.strip()) for x in v['medida'].lower().split('x')]
-                    piezas_exactas.append({"w": round(w, 1), "h": round(h, 1), "etiqueta": v['etiqueta'], "original": v['medida']})
-                    # Reducción de 0.5 por lado (1 cm total)
-                    piezas_reducidas.append({"w": round(w - 1.0, 1), "h": round(h - 1.0, 1), "etiqueta": v['etiqueta'], "original": v['medida']})
-                except: pass
-                
-            piezas_rescatadas = []
-            pendientes_exactas = []
-            pendientes_reducidas = []
-            
-            # 1. Rescatar de pedacería primero
-            for i in range(len(piezas_exactas)):
-                p_ex = piezas_exactas[i]
-                p_red = piezas_reducidas[i]
-                colocado = False
-                for ped in pedaceria:
-                    if not ped["usado"]:
-                        if (p_ex["w"] <= ped["w"] and p_ex["h"] <= ped["h"]) or (p_ex["w"] <= ped["h"] and p_ex["h"] <= ped["w"]):
-                            ped["usado"] = True
-                            piezas_rescatadas.append({"pieza": p_ex, "pedazo": ped})
-                            colocado = True
-                            break
-                if not colocado:
-                    pendientes_exactas.append(p_ex)
-                    pendientes_reducidas.append(p_red)
-                    
-            def calcular_tetris(piezas_pendientes, ancho_hoja, alto_hoja):
-                # ROTACIÓN INTELIGENTE: Asegura que la pieza siempre esté "parada" para apilar columnas mejor
-                lista = []
-                for p in piezas_pendientes:
-                    if p["w"] > p["h"]:
-                        lista.append({"w": p["h"], "h": p["w"], "etiqueta": p["etiqueta"] + " (Rotado)"})
-                    else:
-                        lista.append({"w": p["w"], "h": p["h"], "etiqueta": p["etiqueta"]})
-                        
-                # Ordenar de más ancho a más angosto
-                lista.sort(key=lambda x: x["w"], reverse=True)
-                
-                hojas = []
-                
-                for p in lista:
-                    colocado = False
-                    # Buscar huecos en hojas y columnas previas (Algoritmo First-Fit)
-                    for hoja in hojas:
-                        for col in hoja["columnas"]:
-                            if col["ancho"] >= p["w"] and (col["alto_usado"] + p["h"]) <= alto_hoja:
-                                col["piezas"].append(p)
-                                col["alto_usado"] += p["h"]
-                                colocado = True
-                                break
-                        if colocado: break
-                        
-                        # Si no cabe en las columnas, abrir una nueva columna en la misma hoja
-                        if not colocado and (hoja["ancho_usado"] + p["w"]) <= ancho_hoja:
-                            nueva_col = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
-                            hoja["columnas"].append(nueva_col)
-                            hoja["ancho_usado"] += p["w"]
-                            colocado = True
-                            break
-                            
-                    # Si de plano no cabe en ninguna hoja, abrir una hoja nueva
-                    if not colocado:
-                        nueva_hoja = {
-                            "ancho_usado": p["w"], 
-                            "columnas": [{"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}]
-                        }
-                        hojas.append(nueva_hoja)
-                        
-                return hojas
-
-            # 2. Evaluar y competir en los 4 escenarios
-            scenarios = []
-            if pendientes_exactas:
-                h1 = calcular_tetris(pendientes_exactas, 180.0, 260.0)
-                scenarios.append({'hojas': h1, 'ancho': 180.0, 'reducido': False, 'score': len(h1)*(180*260)})
-                
-                h2 = calcular_tetris(pendientes_exactas, 230.0, 260.0)
-                scenarios.append({'hojas': h2, 'ancho': 230.0, 'reducido': False, 'score': len(h2)*(230*260)})
-                
-                h3 = calcular_tetris(pendientes_reducidas, 180.0, 260.0)
-                scenarios.append({'hojas': h3, 'ancho': 180.0, 'reducido': True, 'score': len(h3)*(180*260)})
-                
-                h4 = calcular_tetris(pendientes_reducidas, 230.0, 260.0)
-                scenarios.append({'hojas': h4, 'ancho': 230.0, 'reducido': True, 'score': len(h4)*(230*260)})
-                
-                # Elige el que gaste menos metros cuadrados. En empate, prefiere NO reducir.
-                scenarios.sort(key=lambda x: (x['score'], x['reducido']))
-                best = scenarios[0]
+    def calcular_tetris(piezas_pendientes, ancho_hoja, alto_hoja):
+        # ROTACIÓN INTELIGENTE
+        lista = []
+        for p in piezas_pendientes:
+            if p["w"] > p["h"]:
+                lista.append({"w": p["h"], "h": p["w"], "etiqueta": p["etiqueta"] + " (Rotado)"})
             else:
-                best = {'hojas': [], 'ancho': 180.0, 'reducido': False, 'score': 0}
+                lista.append({"w": p["w"], "h": p["h"], "etiqueta": p["etiqueta"]})
+                
+        lista.sort(key=lambda x: x["w"], reverse=True)
+        hojas = []
+        
+        for p in lista:
+            colocado = False
+            for hoja in hojas:
+                for col in hoja["columnas"]:
+                    if col["ancho"] >= p["w"] and (col["alto_usado"] + p["h"]) <= alto_hoja:
+                        col["piezas"].append(p)
+                        col["alto_usado"] += p["h"]
+                        colocado = True
+                        break
+                if colocado: break
+                
+                if not colocado and (hoja["ancho_usado"] + p["w"]) <= ancho_hoja:
+                    nueva_col = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
+                    hoja["columnas"].append(nueva_col)
+                    hoja["ancho_usado"] += p["w"]
+                    colocado = True
+                    break
+                    
+            if not colocado:
+                nueva_hoja = {
+                    "ancho_usado": p["w"], 
+                    "columnas": [{"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}]
+                }
+                hojas.append(nueva_hoja)
+                
+        return hojas
 
-            return best['hojas'], piezas_rescatadas, best
-    # 2. Evaluar los 4 escenarios
+    # 2. Evaluar y competir en los 4 escenarios
     scenarios = []
     if pendientes_exactas:
         h1 = calcular_tetris(pendientes_exactas, 180.0, 260.0)
@@ -191,7 +166,7 @@ def optimizador_inteligente(cortes_num, pedaceria_str, tramo_ideal=600.0):
         h4 = calcular_tetris(pendientes_reducidas, 230.0, 260.0)
         scenarios.append({'hojas': h4, 'ancho': 230.0, 'reducido': True, 'score': len(h4)*(230*260)})
         
-        # Ordenar por el que gasta menos m2. En caso de empate, prefiere NO reducir (False < True)
+        # Elige el que gaste menos m2. En empate, prefiere NO reducir.
         scenarios.sort(key=lambda x: (x['score'], x['reducido']))
         best = scenarios[0]
     else:
@@ -437,7 +412,6 @@ else:
             try:
                 from fpdf import FPDF
                 import base64
-                from datetime import datetime
 
                 pdf = FPDF()
                 pdf.add_page()
@@ -500,9 +474,6 @@ else:
             try:
                 from fpdf import FPDF
                 import base64
-                import math
-                from datetime import datetime
-                from logica_cotizador import Ventana
 
                 tot_chambrana = tot_riel = tot_cerco = tot_traslape = tot_cabezal = tot_zoclo = tot_vinil = 0.0
                 num_ventanas = 0
@@ -622,7 +593,6 @@ else:
                     hojas_vidrio_comprar, _, config = optimizador_vidrio(todos_los_vidrios_pdf, "")
                     total_hojas = len(hojas_vidrio_comprar)
                     
-                    # El motor inteligente nos dice qué decisión tomó
                     ancho_pdf = int(config['ancho'])
                     txt_red = " (Con reduccion de 0.5cm p/lado)" if config['reducido'] else " (Medida exacta de corte)"
                     
