@@ -69,7 +69,8 @@ def optimizador_inteligente(cortes_num, pedaceria_str, tramo_ideal=600.0):
             
     return tramos_nuevos, uso_ped
 
-def optimizador_vidrio(vidrios_list, pedaceria_str, ancho_hoja=180.0, alto_hoja=260.0):
+# --- MOTOR DE VIDRIO CON EVALUADOR DE 4 ESCENARIOS ---
+def optimizador_vidrio(vidrios_list, pedaceria_str):
     pedaceria = []
     if pedaceria_str.strip():
         for t in pedaceria_str.split(','):
@@ -78,62 +79,90 @@ def optimizador_vidrio(vidrios_list, pedaceria_str, ancho_hoja=180.0, alto_hoja=
                 pedaceria.append({"w": w, "h": h, "usado": False, "original": t})
             except: pass
     
-    piezas_reales = []
+    piezas_exactas = []
+    piezas_reducidas = []
+    
     for v in vidrios_list:
         try:
             w, h = [float(x.strip()) for x in v['medida'].lower().split('x')]
-            piezas_reales.append({
-                "w": round(w, 1), 
-                "h": round(h, 1), 
-                "etiqueta": v['etiqueta'], 
-                "original": v['medida']
-            })
+            piezas_exactas.append({"w": round(w, 1), "h": round(h, 1), "etiqueta": v['etiqueta'], "original": v['medida']})
+            # La reducción de 0.5 por lado equivale a quitar 1 cm al total
+            piezas_reducidas.append({"w": round(w - 1.0, 1), "h": round(h - 1.0, 1), "etiqueta": v['etiqueta'], "original": v['medida']})
         except: pass
-    
-    piezas_pendientes = []
+        
     piezas_rescatadas = []
+    pendientes_exactas = []
+    pendientes_reducidas = []
     
-    for p in piezas_reales:
+    # 1. Rescatar de la pedacería (usando medidas exactas siempre por seguridad)
+    for i in range(len(piezas_exactas)):
+        p_ex = piezas_exactas[i]
+        p_red = piezas_reducidas[i]
         colocado = False
         for ped in pedaceria:
             if not ped["usado"]:
-                if (p["w"] <= ped["w"] and p["h"] <= ped["h"]) or (p["w"] <= ped["h"] and p["h"] <= ped["w"]):
+                if (p_ex["w"] <= ped["w"] and p_ex["h"] <= ped["h"]) or (p_ex["w"] <= ped["h"] and p_ex["h"] <= ped["w"]):
                     ped["usado"] = True
-                    piezas_rescatadas.append({"pieza": p, "pedazo": ped})
+                    piezas_rescatadas.append({"pieza": p_ex, "pedazo": ped})
                     colocado = True
                     break
         if not colocado:
-            piezas_pendientes.append(p)
+            pendientes_exactas.append(p_ex)
+            pendientes_reducidas.append(p_red)
             
-    piezas_pendientes.sort(key=lambda x: x["w"], reverse=True)
-    
-    hojas = []
-    hoja_actual = {"ancho_usado": 0.0, "columnas": []}
-    col_actual = {"ancho": 0.0, "alto_usado": 0.0, "piezas": []}
-    
-    for p in piezas_pendientes:
-        if col_actual["ancho"] >= p["w"] and (col_actual["alto_usado"] + p["h"]) <= alto_hoja:
-            col_actual["piezas"].append(p)
-            col_actual["alto_usado"] += p["h"]
-        else:
-            if col_actual["piezas"]:
-                hoja_actual["columnas"].append(col_actual)
-                hoja_actual["ancho_usado"] += col_actual["ancho"]
-            
-            if hoja_actual["ancho_usado"] + p["w"] <= ancho_hoja:
-                col_actual = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
-            else:
-                hojas.append(hoja_actual)
-                hoja_actual = {"ancho_usado": 0.0, "columnas": []}
-                col_actual = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
-                
-    if col_actual["piezas"]:
-        hoja_actual["columnas"].append(col_actual)
-        hoja_actual["ancho_usado"] += col_actual["ancho"]
-    if hoja_actual["columnas"]:
-        hojas.append(hoja_actual)
+    def calcular_tetris(piezas_pendientes, ancho_hoja, alto_hoja):
+        lista = [p.copy() for p in piezas_pendientes]
+        lista.sort(key=lambda x: x["w"], reverse=True)
+        hojas = []
+        hoja_actual = {"ancho_usado": 0.0, "columnas": []}
+        col_actual = {"ancho": 0.0, "alto_usado": 0.0, "piezas": []}
         
-    return hojas, piezas_rescatadas
+        for p in lista:
+            if col_actual["ancho"] >= p["w"] and (col_actual["alto_usado"] + p["h"]) <= alto_hoja:
+                col_actual["piezas"].append(p)
+                col_actual["alto_usado"] += p["h"]
+            else:
+                if col_actual["piezas"]:
+                    hoja_actual["columnas"].append(col_actual)
+                    hoja_actual["ancho_usado"] += col_actual["ancho"]
+                
+                if hoja_actual["ancho_usado"] + p["w"] <= ancho_hoja:
+                    col_actual = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
+                else:
+                    hojas.append(hoja_actual)
+                    hoja_actual = {"ancho_usado": 0.0, "columnas": []}
+                    col_actual = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
+        
+        if col_actual["piezas"]:
+            hoja_actual["columnas"].append(col_actual)
+            hoja_actual["ancho_usado"] += col_actual["ancho"]
+        if hoja_actual["columnas"]:
+            hojas.append(hoja_actual)
+            
+        return hojas
+
+    # 2. Evaluar los 4 escenarios
+    scenarios = []
+    if pendientes_exactas:
+        h1 = calcular_tetris(pendientes_exactas, 180.0, 260.0)
+        scenarios.append({'hojas': h1, 'ancho': 180.0, 'reducido': False, 'score': len(h1)*(180*260)})
+        
+        h2 = calcular_tetris(pendientes_exactas, 230.0, 260.0)
+        scenarios.append({'hojas': h2, 'ancho': 230.0, 'reducido': False, 'score': len(h2)*(230*260)})
+        
+        h3 = calcular_tetris(pendientes_reducidas, 180.0, 260.0)
+        scenarios.append({'hojas': h3, 'ancho': 180.0, 'reducido': True, 'score': len(h3)*(180*260)})
+        
+        h4 = calcular_tetris(pendientes_reducidas, 230.0, 260.0)
+        scenarios.append({'hojas': h4, 'ancho': 230.0, 'reducido': True, 'score': len(h4)*(230*260)})
+        
+        # Ordenar por el que gasta menos m2. En caso de empate, prefiere NO reducir (False < True)
+        scenarios.sort(key=lambda x: (x['score'], x['reducido']))
+        best = scenarios[0]
+    else:
+        best = {'hojas': [], 'ancho': 180.0, 'reducido': False, 'score': 0}
+
+    return best['hojas'], piezas_rescatadas, best
 
 # ==========================================
 # BARRA LATERAL (ROLES Y GESTIÓN DE PROYECTOS)
@@ -379,8 +408,7 @@ else:
                 pdf.add_page()
                 
                 try:
-                    # LOGO 20% más grande (45 * 1.2 = 54)
-                    pdf.image("logopagina.png", x=10, y=8, w=54)
+                    pdf.image("logopagina.png", x=10, y=8, w=54) # LOGO 20% más grande
                 except:
                     pass 
                 
@@ -445,8 +473,6 @@ else:
                 num_ventanas = 0
                 
                 lista_medidas = []
-                
-                # Listas para recolectar el vidrio del proyecto
                 vidrios_fijos = []
                 vidrios_corredizos = []
                 vidrios_puerta = []
@@ -477,7 +503,6 @@ else:
                         
                         tot_vinil += ((luz_ancho + luz_alto_f) * 2) + ((luz_ancho + luz_alto_c) * 2)
                         
-                        # Almacenamos el vidrio
                         vidrios_fijos.append({"medida": f"{round(a_vf*100, 1)} x {round(alt_vf*100, 1)}", "etiqueta": f"P{i+1}"})
                         vidrios_corredizos.append({"medida": f"{round(a_vc*100, 1)} x {round(alt_vc*100, 1)}", "etiqueta": f"P{i+1}"})
                         
@@ -491,8 +516,7 @@ else:
                 pdf.add_page()
                 
                 try:
-                    # LOGO 20% más grande (w=54)
-                    pdf.image("logopagina.png", x=10, y=8, w=54)
+                    pdf.image("logopagina.png", x=10, y=8, w=54) # LOGO 20% más grande
                 except:
                     pass 
                 
@@ -550,20 +574,24 @@ else:
                 else:
                     pdf.cell(0, 8, "No se registraron ventanas en este proyecto.", ln=True)
 
-                # --- SECCIÓN 3: CRISTAL / VIDRIO (NUEVO) ---
+                # --- SECCIÓN 3: CRISTAL / VIDRIO INTELIGENTE ---
                 pdf.ln(6)
                 pdf.set_font("Arial", 'B', 12)
-                pdf.cell(0, 8, " 3. CRISTAL / VIDRIO (Hojas de 180x260 cm)", ln=True, fill=True)
+                pdf.cell(0, 8, " 3. CRISTAL / VIDRIO (Optimizacion Automatica)", ln=True, fill=True)
                 pdf.ln(4)
                 
                 pdf.set_font("Arial", '', 11)
                 todos_los_vidrios_pdf = vidrios_fijos + vidrios_corredizos + vidrios_puerta
                 
                 if todos_los_vidrios_pdf:
-                    # Usamos nuestra función inteligente (sin pedacería previa para la lista de súper)
-                    hojas_vidrio_comprar, _ = optimizador_vidrio(todos_los_vidrios_pdf, "")
+                    hojas_vidrio_comprar, _, config = optimizador_vidrio(todos_los_vidrios_pdf, "")
                     total_hojas = len(hojas_vidrio_comprar)
-                    pdf.cell(0, 8, f"[   ]   {total_hojas} Hoja(s) de Cristal requeridas", ln=True)
+                    
+                    # El motor inteligente nos dice qué decisión tomó
+                    ancho_pdf = int(config['ancho'])
+                    txt_red = " (Con reduccion de 0.5cm p/lado)" if config['reducido'] else " (Medida exacta de corte)"
+                    
+                    pdf.cell(0, 8, f"[   ]   {total_hojas} Hoja(s) requerida(s) de {ancho_pdf}x260 cm{txt_red}", ln=True)
                 else:
                     pdf.cell(0, 8, "No se requiere cristal para este proyecto.", ln=True)
 
@@ -770,20 +798,24 @@ else:
             # RENDER DE OPTIMIZACIÓN DE VIDRIO
             # ==========================================
             st.write("---")
-            st.subheader("🧊 Cálculo Inteligente de Cristal (Medidas reales de corte)")
+            st.subheader("🧊 Cálculo Inteligente de Cristal")
             
             todos_los_vidrios = vidrios_fijos + vidrios_corredizos + vidrios_puerta
-            hojas_vidrio, vidrios_rescatados = optimizador_vidrio(todos_los_vidrios, ped_vidrio)
+            hojas_vidrio, vidrios_rescatados, best_config = optimizador_vidrio(todos_los_vidrios, ped_vidrio)
             
             if vidrios_rescatados:
                 st.write("**♻️ Rescatados de la pedacería del taller:**")
                 for r in vidrios_rescatados:
                     p = r["pieza"]
                     ped = r["pedazo"]
-                    st.success(f"- Pieza para `{p['etiqueta']}`: Corte final de **{p['w']} x {p['h']} cm** *(Salió del retazo de {ped['original']})*")
+                    st.success(f"- Pieza para `{p['etiqueta']}`: Corte de **{p['w']} x {p['h']} cm** *(Salió del retazo de {ped['original']})*")
             
             if hojas_vidrio:
-                st.write(f"**🛒 Comprar {len(hojas_vidrio)} Hoja(s) de Cristal (180 x 260 cm):**")
+                ancho = int(best_config['ancho'])
+                texto_red = "(Con reduccion de 0.5 cm por lado)" if best_config['reducido'] else "(Usando medida exacta de corte)"
+                
+                st.write(f"**🛒 Comprar {len(hojas_vidrio)} Hoja(s) de Cristal de {ancho} x 260 cm {texto_red}:**")
+                
                 for i, h in enumerate(hojas_vidrio):
                     st.markdown(f"#### 📄 Hoja {i+1} (Se usaron {round(h['ancho_usado'], 1)} cm a lo ancho)")
                     for j, col in enumerate(h['columnas']):
