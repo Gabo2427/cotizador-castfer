@@ -334,9 +334,6 @@ else:
         # ==========================================
         # BOTÓN 2: LISTA DE MATERIALES PARA PROVEEDOR (NUEVO DISEÑO PROFESIONAL)
         # ==========================================
-        # ==========================================
-        # BOTÓN 2: LISTA DE MATERIALES PARA PROVEEDOR (NUEVO DISEÑO PROFESIONAL)
-        # ==========================================
         if st.button("🛒 Generar Lista de Materiales (PDF)", type="secondary", use_container_width=True):
             try:
                 from fpdf import FPDF
@@ -348,11 +345,9 @@ else:
                 tot_chambrana = tot_riel = tot_cerco = tot_traslape = tot_cabezal = tot_zoclo = tot_vinil = 0.0
                 num_ventanas = 0
                 
-                # NUEVO: Lista para guardar las medidas de forma compacta
                 lista_medidas = []
 
                 for i, p in enumerate(st.session_state.proyecto):
-                    # Guardamos la medida de cada pieza para imprimirla al final
                     texto_medida = f"P{i+1}: {round(p['ancho']*100,1)}x{round(p['alto']*100,1)}cm"
                     lista_medidas.append(texto_medida)
 
@@ -399,7 +394,7 @@ else:
                 
                 pdf.ln(8)
                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-                pdf.ln(5) # Reduje un poco el espacio para asegurar que quepa en 1 hoja
+                pdf.ln(5)
 
                 # --- SECCIÓN PERFILES ---
                 pdf.set_font("Arial", 'B', 12)
@@ -412,10 +407,9 @@ else:
                 def agregar_perfil(nombre, total_cm):
                     if total_cm > 0:
                         tiras = math.ceil(total_cm / 600.0)
-                        # Convertimos los centímetros a metros (dividiendo entre 100) y dejamos 2 decimales
                         total_mts = round(total_cm / 100.0, 2)
                         pdf.cell(0, 8, f"[   ]   {tiras} {nombre} de 6 mts   (Total neto requerido: {total_mts} mts)", ln=True)
-                        
+
                 agregar_perfil("Chambranas", tot_chambrana)
                 agregar_perfil("Rieles", tot_riel)
                 agregar_perfil("Cercos", tot_cerco)
@@ -450,10 +444,7 @@ else:
                 
                 pdf.set_font("Arial", '', 10)
                 if lista_medidas:
-                    # Unimos todas las medidas con un puntito chido separador
-                    # Unimos todas las medidas con una barra separadora (carácter compatible)
                     texto_medidas = "   |   ".join(lista_medidas)
-                    # Usamos multi_cell para que el texto baje de renglón automáticamente sin salirse de la hoja
                     pdf.multi_cell(0, 6, texto_medidas)
                 
                 # --- NOTA FINAL ---
@@ -462,7 +453,6 @@ else:
                 pdf.set_text_color(100, 100, 100)
                 pdf.cell(0, 5, "Nota: El calculo de perfiles ha sido redondeado a piezas enteras de 6m para facilitar la compra.", ln=True, align='C')
 
-                # Botón de Descarga
                 pdf_bytes = pdf.output(dest='S').encode('latin-1')
                 b64 = base64.b64encode(pdf_bytes).decode()
                 href = f'<a href="data:application/pdf;base64,{b64}" download="Compras_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #28a745; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>'
@@ -479,16 +469,18 @@ else:
     # SECCIÓN 4: OPTIMIZACIÓN (TALLER)
     # ==========================================
     with st.expander("♻️ ¿Tienes pedacería en el taller? (Opcional)"):
-        st.info("Ingresa la medida de tus recortes en centímetros, separados por comas. Si no tienes, déjalo en blanco.")
-        col_p1, col_p2 = st.columns(2)
+        st.info("Aluminio: Ingresa cm separados por comas (ej: 120, 80). Vidrio: Ingresa Ancho x Alto (ej: 90x60, 100x80).")
+        col_p1, col_p2, col_p3 = st.columns(3)
         with col_p1:
             ped_chambrana = st.text_input("Recortes de Chambrana:", "")
             ped_cerco = st.text_input("Recortes de Cerco:", "")
-            ped_cabezal = st.text_input("Recortes de Cabezal:", "")
         with col_p2:
             ped_riel = st.text_input("Recortes de Riel:", "")
             ped_traslape = st.text_input("Recortes de Traslape:", "")
+        with col_p3:
+            ped_cabezal = st.text_input("Recortes de Cabezal:", "")
             ped_zoclo = st.text_input("Recortes de Zoclo:", "")
+            ped_vidrio = st.text_input("Recortes de Vidrio:", "")
 
     st.write("")
     
@@ -637,6 +629,73 @@ else:
                     
             return tramos_nuevos, uso_ped
 
+        # --- NUEVO MOTOR DE OPTIMIZACIÓN DE VIDRIO (MEDIDAS REALES) ---
+        def optimizador_vidrio(vidrios_list, pedaceria_str, ancho_hoja=180.0, alto_hoja=260.0):
+            pedaceria = []
+            if pedaceria_str.strip():
+                for t in pedaceria_str.split(','):
+                    try:
+                        w, h = [float(x.strip()) for x in t.lower().split('x')]
+                        pedaceria.append({"w": w, "h": h, "usado": False, "original": t})
+                    except: pass
+            
+            piezas_reales = []
+            for v in vidrios_list:
+                try:
+                    w, h = [float(x.strip()) for x in v['medida'].lower().split('x')]
+                    piezas_reales.append({
+                        "w": round(w, 1), 
+                        "h": round(h, 1), 
+                        "etiqueta": v['etiqueta'], 
+                        "original": v['medida']
+                    })
+                except: pass
+            
+            piezas_pendientes = []
+            piezas_rescatadas = []
+            
+            for p in piezas_reales:
+                colocado = False
+                for ped in pedaceria:
+                    if not ped["usado"]:
+                        if (p["w"] <= ped["w"] and p["h"] <= ped["h"]) or (p["w"] <= ped["h"] and p["h"] <= ped["w"]):
+                            ped["usado"] = True
+                            piezas_rescatadas.append({"pieza": p, "pedazo": ped})
+                            colocado = True
+                            break
+                if not colocado:
+                    piezas_pendientes.append(p)
+                    
+            piezas_pendientes.sort(key=lambda x: x["w"], reverse=True)
+            
+            hojas = []
+            hoja_actual = {"ancho_usado": 0.0, "columnas": []}
+            col_actual = {"ancho": 0.0, "alto_usado": 0.0, "piezas": []}
+            
+            for p in piezas_pendientes:
+                if col_actual["ancho"] >= p["w"] and (col_actual["alto_usado"] + p["h"]) <= alto_hoja:
+                    col_actual["piezas"].append(p)
+                    col_actual["alto_usado"] += p["h"]
+                else:
+                    if col_actual["piezas"]:
+                        hoja_actual["columnas"].append(col_actual)
+                        hoja_actual["ancho_usado"] += col_actual["ancho"]
+                    
+                    if hoja_actual["ancho_usado"] + p["w"] <= ancho_hoja:
+                        col_actual = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
+                    else:
+                        hojas.append(hoja_actual)
+                        hoja_actual = {"ancho_usado": 0.0, "columnas": []}
+                        col_actual = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
+                        
+            if col_actual["piezas"]:
+                hoja_actual["columnas"].append(col_actual)
+                hoja_actual["ancho_usado"] += col_actual["ancho"]
+            if hoja_actual["columnas"]:
+                hojas.append(hoja_actual)
+                
+            return hojas, piezas_rescatadas
+
         # ==========================================
         # PESTAÑA 2: OPTIMIZACIÓN Y COMPRAS
         # ==========================================
@@ -679,6 +738,36 @@ else:
             mostrar_optimizacion("Cerco Puerta", cortes_cerco_puerta, "")
             mostrar_optimizacion("Horizontales Puerta (Zoclo, Cabezal, Intermedio)", cortes_horizontales_puerta, "")
             mostrar_optimizacion("Duelas", cortes_duela_puerta, "")
+
+            # ==========================================
+            # RENDER DE OPTIMIZACIÓN DE VIDRIO
+            # ==========================================
+            st.write("---")
+            st.subheader("🧊 Cálculo Inteligente de Cristal (Medidas reales de corte)")
+            
+            todos_los_vidrios = vidrios_fijos + vidrios_corredizos + vidrios_puerta
+            hojas_vidrio, vidrios_rescatados = optimizador_vidrio(todos_los_vidrios, ped_vidrio)
+            
+            if vidrios_rescatados:
+                st.write("**♻️ Rescatados de la pedacería del taller:**")
+                for r in vidrios_rescatados:
+                    p = r["pieza"]
+                    ped = r["pedazo"]
+                    st.success(f"- Pieza para `{p['etiqueta']}`: Corte final de **{p['w']} x {p['h']} cm** *(Salió del retazo de {ped['original']})*")
+            
+            if hojas_vidrio:
+                st.write(f"**🛒 Comprar {len(hojas_vidrio)} Hoja(s) de Cristal (180 x 260 cm):**")
+                for i, h in enumerate(hojas_vidrio):
+                    st.markdown(f"#### 📄 Hoja {i+1} (Se usaron {round(h['ancho_usado'], 1)} cm a lo ancho)")
+                    for j, col in enumerate(h['columnas']):
+                        st.info(f"**Corte {j+1}:** Cortar una tira a lo largo de **{col['ancho']} cm** de ancho. De esta tira salen:")
+                        for p in col['piezas']:
+                            st.write(f"  - 1 pieza de **{p['w']} x {p['h']} cm** (para {p['etiqueta']})")
+            elif not vidrios_rescatados and not hojas_vidrio:
+                st.info("No hay vidrios registrados en este proyecto.")
+            else:
+                st.balloons()
+                st.success("¡Excelente! Todo el vidrio para este proyecto salió de tu pedacería, compras: 0.")
 
         # ==========================================
         # PESTAÑA 3: WHATSAPP
@@ -726,3 +815,4 @@ else:
             texto_wa += txt_grupo_rastreo("Vidrios Puerta", vidrios_puerta)
 
             st.code(texto_wa, language="markdown")
+            
