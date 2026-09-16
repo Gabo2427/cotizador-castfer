@@ -71,7 +71,7 @@ def optimizador_inteligente(cortes_num, pedaceria_str, tramo_ideal=600.0):
             
     return tramos_nuevos, uso_ped
 
-# --- MOTOR DE VIDRIO AVANZADO CON ROTACIÓN Y 4 ESCENARIOS ---
+# --- MOTOR DE VIDRIO CON GUILLOTINA 2D Y 4 ESCENARIOS ---
 def optimizador_vidrio(vidrios_list, pedaceria_str):
     pedaceria = []
     if pedaceria_str.strip():
@@ -88,7 +88,6 @@ def optimizador_vidrio(vidrios_list, pedaceria_str):
         try:
             w, h = [float(x.strip()) for x in v['medida'].lower().split('x')]
             piezas_exactas.append({"w": round(w, 1), "h": round(h, 1), "etiqueta": v['etiqueta'], "original": v['medida']})
-            # Reducción de 0.5 por lado (1 cm total)
             piezas_reducidas.append({"w": round(w - 1.0, 1), "h": round(h - 1.0, 1), "etiqueta": v['etiqueta'], "original": v['medida']})
         except: pass
         
@@ -112,46 +111,69 @@ def optimizador_vidrio(vidrios_list, pedaceria_str):
             pendientes_exactas.append(p_ex)
             pendientes_reducidas.append(p_red)
             
+    # 2. Algoritmo de Empaquetado 2D (Guillotina / Árbol Binario)
     def calcular_tetris(piezas_pendientes, ancho_hoja, alto_hoja):
-        # ROTACIÓN INTELIGENTE
-        lista = []
-        for p in piezas_pendientes:
-            if p["w"] > p["h"]:
-                lista.append({"w": p["h"], "h": p["w"], "etiqueta": p["etiqueta"] + " (Rotado)"})
-            else:
-                lista.append({"w": p["w"], "h": p["h"], "etiqueta": p["etiqueta"]})
-                
-        lista.sort(key=lambda x: x["w"], reverse=True)
-        hojas = []
+        # Ordenar por el lado más largo para mejor acomodo
+        lista = sorted(piezas_pendientes, key=lambda p: max(p["w"], p["h"]), reverse=True)
         
+        class Node:
+            def __init__(self, x, y, w, h):
+                self.x, self.y, self.w, self.h = x, y, w, h
+                self.used = False
+                self.right = None
+                self.bottom = None
+
+            def insert(self, pw, ph):
+                if self.used:
+                    res = self.right.insert(pw, ph)
+                    if res: return res
+                    return self.bottom.insert(pw, ph)
+                elif pw <= self.w and ph <= self.h:
+                    self.used = True
+                    dw, dh = self.w - pw, self.h - ph
+                    if dw > dh: # Corte vertical
+                        self.right = Node(self.x + pw, self.y, dw, self.h)
+                        self.bottom = Node(self.x, self.y + ph, pw, dh)
+                    else: # Corte horizontal
+                        self.right = Node(self.x + pw, self.y, dw, ph)
+                        self.bottom = Node(self.x, self.y + ph, self.w, dh)
+                    return self
+                return None
+
+        hojas = []
         for p in lista:
+            pw, ph = p["w"], p["h"]
             colocado = False
-            for hoja in hojas:
-                for col in hoja["columnas"]:
-                    if col["ancho"] >= p["w"] and (col["alto_usado"] + p["h"]) <= alto_hoja:
-                        col["piezas"].append(p)
-                        col["alto_usado"] += p["h"]
-                        colocado = True
-                        break
-                if colocado: break
-                
-                if not colocado and (hoja["ancho_usado"] + p["w"]) <= ancho_hoja:
-                    nueva_col = {"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}
-                    hoja["columnas"].append(nueva_col)
-                    hoja["ancho_usado"] += p["w"]
+            
+            for raiz in hojas:
+                # Intenta normal
+                if raiz['tree'].insert(pw, ph):
+                    raiz['piezas'].append({"w": pw, "h": ph, "etiqueta": p["etiqueta"]})
+                    colocado = True
+                    break
+                # Intenta rotado
+                elif raiz['tree'].insert(ph, pw):
+                    raiz['piezas'].append({"w": ph, "h": pw, "etiqueta": p["etiqueta"] + " (Rotado)"})
                     colocado = True
                     break
                     
             if not colocado:
-                nueva_hoja = {
-                    "ancho_usado": p["w"], 
-                    "columnas": [{"ancho": p["w"], "alto_usado": p["h"], "piezas": [p]}]
-                }
-                hojas.append(nueva_hoja)
-                
-        return hojas
+                nueva_raiz = Node(0, 0, ancho_hoja, alto_hoja)
+                if nueva_raiz.insert(pw, ph):
+                    hojas.append({'tree': nueva_raiz, 'piezas': [{"w": pw, "h": ph, "etiqueta": p["etiqueta"]}]})
+                elif nueva_raiz.insert(ph, pw):
+                    hojas.append({'tree': nueva_raiz, 'piezas': [{"w": ph, "h": pw, "etiqueta": p["etiqueta"] + " (Rotado)"}]})
+                    
+        # Formatear para que el PDF lo lea sin marcar errores
+        hojas_out = []
+        for h in hojas:
+            hojas_out.append({
+                "ancho_usado": ancho_hoja, 
+                "columnas": [{"ancho": "Variado", "alto_usado": "Variado", "piezas": h['piezas']}]
+            })
+        return hojas_out
 
-    # 2. Evaluar y competir en los 4 escenarios
+    # 3. Competencia de los 4 escenarios
     scenarios = []
     if pendientes_exactas:
         h1 = calcular_tetris(pendientes_exactas, 180.0, 260.0)
@@ -166,7 +188,6 @@ def optimizador_vidrio(vidrios_list, pedaceria_str):
         h4 = calcular_tetris(pendientes_reducidas, 230.0, 260.0)
         scenarios.append({'hojas': h4, 'ancho': 230.0, 'reducido': True, 'score': len(h4)*(230*260)})
         
-        # Elige el que gaste menos m2. En empate, prefiere NO reducir.
         scenarios.sort(key=lambda x: (x['score'], x['reducido']))
         best = scenarios[0]
     else:
@@ -879,3 +900,4 @@ else:
             texto_wa += txt_grupo_rastreo("Vidrios Puerta", vidrios_puerta)
 
             st.code(texto_wa, language="markdown")
+            
