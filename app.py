@@ -283,9 +283,12 @@ if is_editing:
     pieza_actual = st.session_state.proyecto[idx]
     def_tipo, def_detalle = pieza_actual['tipo'], pieza_actual['detalle']
     def_ancho, def_alto = float(pieza_actual['ancho'] * 100), float(pieza_actual['alto'] * 100)
+    def_diseno = pieza_actual.get('diseno', "2 hojas")
+    def_cuadricula = pieza_actual.get('cuadricula', False)
 else:
     st.subheader("1. Agregar nueva pieza")
     def_tipo, def_detalle, def_ancho, def_alto = "Ventana Corrediza", "3 pulgadas", 100.0, 210.0
+    def_diseno, def_cuadricula = "2 hojas", False
 
 col_tipo, col_detalle = st.columns(2)
 tipos_disponibles = ["Ventana Corrediza", "Puerta", "Cancel de Baño"]
@@ -300,6 +303,21 @@ idx_det = opciones_detalle.index(def_detalle) if def_detalle in opciones_detalle
 with col_detalle:
     detalle_pieza = st.selectbox("Línea/Diseño:", opciones_detalle, index=idx_det)
 
+# ---- NUEVOS CONTROLES PARA VENTANAS ----
+if tipo_pieza == "Ventana Corrediza":
+    col_diseno, col_cuadricula = st.columns(2)
+    opciones_diseno = ["2 hojas", "Fijo Gigante Centro"]
+    idx_diseno = opciones_diseno.index(def_diseno) if def_diseno in opciones_diseno else 0
+    with col_diseno:
+        diseno_pieza = st.selectbox("Estilo de Apertura:", opciones_diseno, index=idx_diseno)
+    with col_cuadricula:
+        st.write("")
+        st.write("")
+        cuadricula_pieza = st.checkbox("Cuadrícula (6 cuadros por hoja)", value=def_cuadricula)
+else:
+    diseno_pieza = "2 hojas"
+    cuadricula_pieza = False
+
 col1, col2 = st.columns(2)
 with col1:
     ancho_input_cm = st.number_input("Ancho (cm)", min_value=1.0, value=def_ancho, step=0.1, format="%.1f")
@@ -311,14 +329,16 @@ with col_btn1:
     if is_editing:
         if st.button("💾 Guardar Cambios", type="primary"):
             st.session_state.proyecto[st.session_state.edit_index] = {
-                "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0
+                "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0,
+                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza
             }
             st.session_state.edit_index = None
             st.rerun()
     else:
         if st.button("➕ Agregar al proyecto"):
             st.session_state.proyecto.append({
-                "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0
+                "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0,
+                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza
             })
             st.success(f"¡{tipo_pieza} agregada!")
 
@@ -330,7 +350,7 @@ with col_btn2:
 st.write("---")
 
 # ==========================================
-# SECCIÓN 2: LISTA DEL CLIENTE E INVENTARIO (AHORA DESPLEGABLE)
+# SECCIÓN 2: LISTA DEL CLIENTE E INVENTARIO
 # ==========================================
 with st.expander("📝 Editar piezas agregadas al proyecto", expanded=False):
     if len(st.session_state.proyecto) > 0:
@@ -350,7 +370,9 @@ with st.expander("📝 Editar piezas agregadas al proyecto", expanded=False):
         for i, pieza in enumerate(st.session_state.proyecto):
             col_text, col_edit, col_del = st.columns([0.85, 0.075, 0.075])
             with col_text:
-                st.markdown(f"**{i+1}. {pieza['tipo']} ({pieza['detalle']})** - {round(pieza['ancho']*100, 1)} cm x {round(pieza['alto']*100, 1)} cm")
+                txt_dis = f" - {pieza.get('diseno', '2 hojas')}" if pieza['tipo'] == "Ventana Corrediza" else ""
+                txt_cuad = " (Cuadrícula)" if pieza.get('cuadricula', False) else ""
+                st.markdown(f"**{i+1}. {pieza['tipo']} ({pieza['detalle']})**{txt_dis}{txt_cuad} - {round(pieza['ancho']*100, 1)} cm x {round(pieza['alto']*100, 1)} cm")
             with col_edit:
                 if st.button("✏️", key=f"edit_{i}", type="tertiary", help="Editar pieza"):
                     st.session_state.edit_index = i
@@ -370,13 +392,12 @@ if st.session_state.get('admin', False):
     
     total_proyecto = 0.0
     
-    # LISTA DE PRECIOS INDIVIDUALES (AHORA DESPLEGABLE)
     with st.expander("💵 Asignar precios individuales por pieza", expanded=False):
         st.markdown("**Ingresa el precio final (material e instalación) por cada pieza:**")
         for i, pieza in enumerate(st.session_state.proyecto):
             col_texto, col_precio = st.columns([3, 1])
             with col_texto:
-                st.markdown(f"<br>**Pieza {i+1}:** {pieza['tipo']} ({round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm) - Línea {pieza['detalle']}", unsafe_allow_html=True)
+                st.markdown(f"<br>**Pieza {i+1}:** {pieza['tipo']} ({round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm)", unsafe_allow_html=True)
             with col_precio:
                 precio_actual = pieza.get('precio', 0.0)
                 precio_pieza = st.number_input("Precio ($)", min_value=0.0, step=100.0, value=float(precio_actual), format="%.2f", key=f"precio_{i}")
@@ -386,7 +407,6 @@ if st.session_state.get('admin', False):
     st.session_state.costo_total = total_proyecto
     st.write("")
     
-    # MÉTRICAS SIEMPRE VISIBLES
     col_total, col_sugerido = st.columns(2)
     with col_total:
         st.metric("Total Cotizado:", f"${total_proyecto:,.2f}")
@@ -436,7 +456,8 @@ if st.session_state.get('admin', False):
                 
                 pdf.set_font("Arial", '', 10)
                 for i, pieza in enumerate(st.session_state.proyecto):
-                    texto_pieza = f"Pieza {i+1}: {pieza['tipo']} - {pieza['detalle']} ({round(pieza['ancho']*100,1)} x {round(pieza['alto']*100,1)} cm)"
+                    txt_dis = f" - {pieza.get('diseno', '2 hojas')}" if pieza['tipo'] == "Ventana Corrediza" else ""
+                    texto_pieza = f"Pieza {i+1}: {pieza['tipo']} {txt_dis} ({round(pieza['ancho']*100,1)} x {round(pieza['alto']*100,1)} cm)"
                     precio_ind = st.session_state.get(f"precio_{i}", 0.0)
                     pdf.cell(140, 8, texto_pieza, border=1)
                     pdf.cell(50, 8, f"${precio_ind:,.2f}", border=1, ln=True, align='R')
@@ -465,10 +486,10 @@ if st.session_state.get('admin', False):
             try:
                 from fpdf import FPDF
                 import base64
-                tot_chambrana = tot_riel = tot_cerco = tot_traslape = tot_cabezal = tot_zoclo = tot_vinil = 0.0
+                tot_chambrana = tot_riel = tot_cerco = tot_traslape = tot_cabezal = tot_zoclo = tot_vinil = tot_intermedio = 0.0
                 num_ventanas = 0
                 lista_medidas = []
-                vidrios_fijos, vidrios_corredizos, vidrios_puerta = [], [], []
+                todos_los_vidrios_pdf = []
 
                 for i, p in enumerate(st.session_state.proyecto):
                     texto_medida = f"P{i+1}: {round(p['ancho']*100,1)}x{round(p['alto']*100,1)}cm"
@@ -476,31 +497,67 @@ if st.session_state.get('admin', False):
 
                     if p['tipo'] == "Ventana Corrediza":
                         num_ventanas += 1
-                        v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco")
+                        diseno = p.get('diseno', "2 hojas")
+                        cuadricula = p.get('cuadricula', False)
+                        
+                        v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=diseno, cuadricula=cuadricula)
                         a_m, alt_l = v.calcular_cortes_marco()
-                        alt_f, a_h = v.calcular_hoja_fija()
-                        alt_c, _ = v.calcular_hoja_corrediza()
-                        a_vf, alt_vf, _ = v.calcular_vidrio(alt_f, a_h)
-                        a_vc, alt_vc, _ = v.calcular_vidrio(alt_c, a_h)
+                        hojas = v.calcular_hojas()
                         
                         tot_chambrana += (alt_l * 2 + a_m) * 100
                         tot_riel += (a_m) * 100
-                        tot_cerco += (alt_f + alt_c) * 100
-                        tot_traslape += (alt_f + alt_c) * 100
-                        tot_cabezal += (a_h * 2) * 100
-                        tot_zoclo += (a_h * 2) * 100
-                        luz_ancho = (a_h * 100) - 10.0
-                        luz_alto_f = (alt_f * 100) - 9.0
-                        luz_alto_c = (alt_c * 100) - 9.0
-                        tot_vinil += ((luz_ancho + luz_alto_f) * 2) + ((luz_ancho + luz_alto_c) * 2)
                         
-                        vidrios_fijos.append({"medida": f"{round(a_vf*100, 1)} x {round(alt_vf*100, 1)}", "etiqueta": f"P{i+1}"})
-                        vidrios_corredizos.append({"medida": f"{round(a_vc*100, 1)} x {round(alt_vc*100, 1)}", "etiqueta": f"P{i+1}"})
-                        
+                        # FUNCIÓN INTERNA PARA PROCESAR CADA HOJA Y SUMAR MATERIALES
+                        def procesar_hoja_proveedor(alto_h, ancho_h, es_gigante):
+                            nonlocal tot_cerco, tot_traslape, tot_cabezal, tot_zoclo, tot_intermedio, tot_vinil
+                            
+                            tot_cabezal += ancho_h * 100
+                            tot_zoclo += ancho_h * 100
+                            if es_gigante:
+                                tot_cerco += (alto_h * 2) * 100 # La hoja gigante lleva 2 cercos
+                            else:
+                                tot_cerco += alto_h * 100
+                                tot_traslape += alto_h * 100
+                                
+                            luz_ancho = (ancho_h * 100) - 10.0
+                            luz_alto = (alto_h * 100) - 9.0
+                            
+                            # INTERMEDIOS Y VIDRIOS
+                            if cuadricula:
+                                ints = v.calcular_intermedios_aluminio(alto_h, ancho_h, es_gigante)
+                                tot_intermedio += sum(ints["verticales"]) * 100
+                                tot_intermedio += sum(ints["horizontales"]) * 100
+                                
+                                alto_int = alto_h - v.perfil_cabezal - v.perfil_zoclo
+                                ancho_int = ancho_h - (v.perfil_cerco_traslape * 2)
+                                filas = 3
+                                cols = 4 if es_gigante else 2
+                                
+                                # Cálculo exacto descontando los 3.6cm del intermedio
+                                alto_v = ((alto_int - (filas - 1) * v.intermedio_frente) / filas) + (v.holgura_vidrio * 2)
+                                ancho_v = ((ancho_int - (cols - 1) * v.intermedio_frente) / cols) + (v.holgura_vidrio * 2)
+                                
+                                tot_vinil += ((ancho_v*100) + (alto_v*100)) * 2 * (filas * cols)
+                                for _ in range(filas * cols):
+                                    todos_los_vidrios_pdf.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": f"P{i+1} (Cuad)"})
+                            else:
+                                tot_vinil += (luz_ancho + luz_alto) * 2
+                                a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
+                                todos_los_vidrios_pdf.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{i+1}"})
+                                
+                        # Procesar según el diseño
+                        if diseno == "2 hojas":
+                            procesar_hoja_proveedor(hojas["fija"][0], hojas["fija"][1], False)
+                            procesar_hoja_proveedor(hojas["corrediza"][0], hojas["corrediza"][1], False)
+                        else:
+                            procesar_hoja_proveedor(hojas["fija_gigante"][0], hojas["fija_gigante"][1], True)
+                            procesar_hoja_proveedor(hojas["corrediza_izq"][0], hojas["corrediza_izq"][1], False)
+                            procesar_hoja_proveedor(hojas["corrediza_der"][0], hojas["corrediza_der"][1], False)
+                            
                     elif p['tipo'] == "Puerta":
                         puerta = Puerta(p['ancho'], p['alto'], p['detalle'], "Blanco")
                         ancho_r, alto_r, cant_duelas = puerta.calcular_relleno()
-                        vidrios_puerta.append({"medida": f"{round(ancho_r*100, 1)} x {round(alto_r*100, 1)}", "etiqueta": f"P{i+1}"})
+                        todos_los_vidrios_pdf.append({"medida": f"{round(ancho_r*100, 1)} x {round(alto_r*100, 1)}", "etiqueta": f"P{i+1}"})
 
                 pdf = FPDF()
                 pdf.add_page()
@@ -535,6 +592,7 @@ if st.session_state.get('admin', False):
                 agregar_perfil("Traslapes", tot_traslape)
                 agregar_perfil("Cabezales", tot_cabezal)
                 agregar_perfil("Zoclos", tot_zoclo)
+                agregar_perfil("Intermedios", tot_intermedio)
                 pdf.ln(4)
 
                 pdf.set_font("Arial", 'B', 12)
@@ -552,7 +610,6 @@ if st.session_state.get('admin', False):
                 pdf.cell(0, 8, " 3. CRISTAL / VIDRIO (Optimizacion Automatica)", ln=True, fill=True)
                 pdf.ln(4)
                 pdf.set_font("Arial", '', 11)
-                todos_los_vidrios_pdf = vidrios_fijos + vidrios_corredizos + vidrios_puerta
                 if todos_los_vidrios_pdf:
                     hojas_vidrio_comprar, _, config = optimizador_vidrio(todos_los_vidrios_pdf, "")
                     txt_red = " (Reduccion 0.5cm)" if config['reducido'] else " (Medida exacta)"
@@ -573,7 +630,7 @@ if st.session_state.get('admin', False):
                 href = f'<a href="data:application/pdf;base64,{b64}" download="Compras_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #6c757d; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>'
                 st.markdown(href, unsafe_allow_html=True)
             except Exception as e:
-                st.error("⚠️ Error generando PDF.")
+                st.error(f"⚠️ Error generando PDF: {e}")
 
     st.write("---")
 
@@ -589,6 +646,7 @@ with st.expander("♻️ ¿Tienes pedacería en el taller? (Opcional)"):
     with col_p2:
         ped_riel = st.text_input("Recortes Riel:", "")
         ped_traslape = st.text_input("Recortes Traslape:", "")
+        ped_intermedio = st.text_input("Recortes Intermedio:", "")
     with col_p3:
         ped_cabezal = st.text_input("Recortes Cabezal:", "")
         ped_zoclo = st.text_input("Recortes Zoclo:", "")
@@ -596,50 +654,74 @@ with st.expander("♻️ ¿Tienes pedacería en el taller? (Opcional)"):
 
 st.write("")
 
-# EL BOTÓN MAESTRO PARA EL TALLER (SIEMPRE VISIBLE ABAJO)
 if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary", use_container_width=True):
     try:
         from fpdf import FPDF
         import base64
         
-        cortes_chambrana, cortes_riel, cortes_cerco, cortes_traslape, cortes_cabezal, cortes_zoclo = [], [], [], [], [], []
-        vidrios_fijos, vidrios_corredizos, vidrios_puerta = [], [], []
+        cortes_chambrana, cortes_riel, cortes_cerco, cortes_traslape, cortes_cabezal, cortes_zoclo, cortes_intermedio = [], [], [], [], [], [], []
+        todos_los_vidrios_taller = []
 
-        def agregar_cortes_con_rastreo(lista_destino, medidas, etiqueta):
-            for m in medidas:
-                lista_destino.append({"medida": m, "etiqueta": etiqueta})
+        def agregar_cortes(lista, medidas, etiqueta):
+            for m in medidas: lista.append({"medida": m, "etiqueta": etiqueta})
         
         for i, p in enumerate(st.session_state.proyecto):
             num_pieza = i + 1  
             if p['tipo'] == "Ventana Corrediza":
-                v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco")
+                diseno = p.get('diseno', "2 hojas")
+                cuadricula = p.get('cuadricula', False)
+                v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=diseno, cuadricula=cuadricula)
+                
                 a_m, alt_l = v.calcular_cortes_marco()
-                alt_f, a_h = v.calcular_hoja_fija()
-                alt_c, _ = v.calcular_hoja_corrediza()
-                a_vf, alt_vf, _ = v.calcular_vidrio(alt_f, a_h)
-                a_vc, alt_vc, _ = v.calcular_vidrio(alt_c, a_h)
+                hojas = v.calcular_hojas()
                 
-                agregar_cortes_con_rastreo(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1)], f"L{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_chambrana, [round(a_m*100, 1)], f"C{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_riel, [round(a_m*100, 1)], f"P{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_cerco, [round(alt_f*100, 1)], f"Fijo-P{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_cerco, [round(alt_c*100, 1)], f"Corr-P{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_traslape, [round(alt_f*100, 1)], f"Fijo-P{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_traslape, [round(alt_c*100, 1)], f"Corr-P{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_cabezal, [round(a_h*100, 1)], f"Fijo-P{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_cabezal, [round(a_h*100, 1)], f"Corr-P{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_zoclo, [round(a_h*100, 1)], f"Fijo-P{num_pieza}")
-                agregar_cortes_con_rastreo(cortes_zoclo, [round(a_h*100, 1)], f"Corr-P{num_pieza}")
+                agregar_cortes(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1), round(a_m*100, 1)], f"L/C-{num_pieza}")
+                agregar_cortes(cortes_riel, [round(a_m*100, 1)], f"P{num_pieza}")
                 
-                vidrios_fijos.append({"medida": f"{round(a_vf*100, 1)} x {round(alt_vf*100, 1)}", "etiqueta": f"P{num_pieza}"})
-                vidrios_corredizos.append({"medida": f"{round(a_vc*100, 1)} x {round(alt_vc*100, 1)}", "etiqueta": f"P{num_pieza}"})
+                def procesar_cortes_hoja(nombre, alto_h, ancho_h, es_gigante):
+                    lbl = f"{nombre}-P{num_pieza}"
+                    agregar_cortes(cortes_cabezal, [round(ancho_h*100, 1)], lbl)
+                    agregar_cortes(cortes_zoclo, [round(ancho_h*100, 1)], lbl)
+                    
+                    if es_gigante:
+                        agregar_cortes(cortes_cerco, [round(alto_h*100, 1)] * 2, lbl)
+                    else:
+                        agregar_cortes(cortes_cerco, [round(alto_h*100, 1)], lbl)
+                        agregar_cortes(cortes_traslape, [round(alto_h*100, 1)], lbl)
+                        
+                    if cuadricula:
+                        ints = v.calcular_intermedios_aluminio(alto_h, ancho_h, es_gigante)
+                        if ints["verticales"]:
+                            agregar_cortes(cortes_intermedio, [round(x*100, 1) for x in ints["verticales"]], f"Vert-{lbl}")
+                        if ints["horizontales"]:
+                            agregar_cortes(cortes_intermedio, [round(x*100, 1) for x in ints["horizontales"]], f"Horz-{lbl}")
+                            
+                        # Vidrio cuadriculado
+                        alto_int = alto_h - v.perfil_cabezal - v.perfil_zoclo
+                        ancho_int = ancho_h - (v.perfil_cerco_traslape * 2)
+                        filas = 3
+                        cols = 4 if es_gigante else 2
+                        alto_v = ((alto_int - (filas - 1) * v.intermedio_frente) / filas) + (v.holgura_vidrio * 2)
+                        ancho_v = ((ancho_int - (cols - 1) * v.intermedio_frente) / cols) + (v.holgura_vidrio * 2)
+                        
+                        for _ in range(filas * cols):
+                            todos_los_vidrios_taller.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": f"{lbl}"})
+                    else:
+                        a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
+                        todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl})
+
+                if diseno == "2 hojas":
+                    procesar_cortes_hoja("Fija", hojas["fija"][0], hojas["fija"][1], False)
+                    procesar_cortes_hoja("Corr", hojas["corrediza"][0], hojas["corrediza"][1], False)
+                else:
+                    procesar_cortes_hoja("FijaG", hojas["fija_gigante"][0], hojas["fija_gigante"][1], True)
+                    procesar_cortes_hoja("CorrI", hojas["corrediza_izq"][0], hojas["corrediza_izq"][1], False)
+                    procesar_cortes_hoja("CorrD", hojas["corrediza_der"][0], hojas["corrediza_der"][1], False)
             
             elif p['tipo'] == "Puerta":
                 puerta = Puerta(p['ancho'], p['alto'], p['detalle'], "Blanco")
-                cabezal_marco, laterales_marco = puerta.calcular_cortes_marco()
-                cerco_hoja, horizontales_hoja = puerta.calcular_cortes_hoja()
                 ancho_r, alto_r, cant_duelas = puerta.calcular_relleno()
-                vidrios_puerta.append({"medida": f"{round(ancho_r*100, 1)} x {round(alto_r*100, 1)}", "etiqueta": f"Vidrio-P{num_pieza}"})
+                todos_los_vidrios_taller.append({"medida": f"{round(ancho_r*100, 1)} x {round(alto_r*100, 1)}", "etiqueta": f"Vidrio-P{num_pieza}"})
 
         pdf = FPDF()
         pdf.add_page()
@@ -681,6 +763,7 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
         pdf_imprimir_perfil("Traslapes", cortes_traslape, ped_traslape)
         pdf_imprimir_perfil("Cabezales de Hoja", cortes_cabezal, ped_cabezal)
         pdf_imprimir_perfil("Zoclos", cortes_zoclo, ped_zoclo)
+        pdf_imprimir_perfil("Intermedios (Divisiones)", cortes_intermedio, ped_intermedio)
 
         pdf.ln(5)
         pdf.set_font("Arial", 'B', 12)
@@ -688,9 +771,8 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
         pdf.cell(0, 8, " MESA DE CRISTAL / VIDRIO", ln=True, fill=True)
         pdf.ln(4)
         
-        todos_los_vidrios = vidrios_fijos + vidrios_corredizos + vidrios_puerta
-        if todos_los_vidrios:
-            hojas_vidrio, vidrios_rescatados, best_config = optimizador_vidrio(todos_los_vidrios, ped_vidrio)
+        if todos_los_vidrios_taller:
+            hojas_vidrio, vidrios_rescatados, best_config = optimizador_vidrio(todos_los_vidrios_taller, ped_vidrio)
             
             if vidrios_rescatados:
                 pdf.set_font("Arial", 'B', 10)
