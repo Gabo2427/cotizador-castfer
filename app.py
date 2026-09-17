@@ -303,20 +303,34 @@ idx_det = opciones_detalle.index(def_detalle) if def_detalle in opciones_detalle
 with col_detalle:
     detalle_pieza = st.selectbox("Línea/Diseño:", opciones_detalle, index=idx_det)
 
-# ---- NUEVOS CONTROLES PARA VENTANAS ----
+# ---- CONTROLES DINÁMICOS PARA VENTANAS ----
 if tipo_pieza == "Ventana Corrediza":
     col_diseno, col_cuadricula = st.columns(2)
     opciones_diseno = ["2 hojas", "Fijo Gigante Centro"]
     idx_diseno = opciones_diseno.index(def_diseno) if def_diseno in opciones_diseno else 0
+    
     with col_diseno:
         diseno_pieza = st.selectbox("Estilo de Apertura:", opciones_diseno, index=idx_diseno)
+        
     with col_cuadricula:
+        # Checkbox principal
         st.write("")
-        st.write("")
-        cuadricula_pieza = st.checkbox("Cuadrícula (6 cuadros por hoja)", value=def_cuadricula)
+        cuadricula_pieza = st.checkbox("Agregar intermedios (Cuadrícula)", value=def_cuadricula)
+        
+        # El submenú solo aparece si activas la palomita
+        if cuadricula_pieza:
+            opciones_grid = ["2x2", "2x3", "3x2", "3x3", "3x4", "4x4"]
+            # Por defecto 2x3 (1 vertical, 2 horizontales), o el que estuviera guardado
+            valor_guardado = pieza_actual.get('tipo_cuadricula', "2x3") if is_editing else "2x3"
+            idx_grid = opciones_grid.index(valor_guardado) if valor_guardado in opciones_grid else 1
+            
+            tipo_cuadricula_pieza = st.selectbox("Diseño (Columnas x Filas por hoja):", opciones_grid, index=idx_grid)
+        else:
+            tipo_cuadricula_pieza = "2x3" # Valor por defecto oculto si no hay palomita
 else:
     diseno_pieza = "2 hojas"
     cuadricula_pieza = False
+    tipo_cuadricula_pieza = "2x3"
 
 col1, col2 = st.columns(2)
 with col1:
@@ -330,7 +344,7 @@ with col_btn1:
         if st.button("💾 Guardar Cambios", type="primary"):
             st.session_state.proyecto[st.session_state.edit_index] = {
                 "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0,
-                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza
+                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza, "tipo_cuadricula": tipo_cuadricula_pieza
             }
             st.session_state.edit_index = None
             st.rerun()
@@ -338,7 +352,7 @@ with col_btn1:
         if st.button("➕ Agregar al proyecto"):
             st.session_state.proyecto.append({
                 "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0,
-                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza
+                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza, "tipo_cuadricula": tipo_cuadricula_pieza
             })
             st.success(f"¡{tipo_pieza} agregada!")
 
@@ -371,7 +385,7 @@ with st.expander("📝 Editar piezas agregadas al proyecto", expanded=False):
             col_text, col_edit, col_del = st.columns([0.85, 0.075, 0.075])
             with col_text:
                 txt_dis = f" - {pieza.get('diseno', '2 hojas')}" if pieza['tipo'] == "Ventana Corrediza" else ""
-                txt_cuad = " (Cuadrícula)" if pieza.get('cuadricula', False) else ""
+                txt_cuad = f" (Cuadrícula {pieza.get('tipo_cuadricula', '2x3')})" if pieza.get('cuadricula', False) else ""
                 st.markdown(f"**{i+1}. {pieza['tipo']} ({pieza['detalle']})**{txt_dis}{txt_cuad} - {round(pieza['ancho']*100, 1)} cm x {round(pieza['alto']*100, 1)} cm")
             with col_edit:
                 if st.button("✏️", key=f"edit_{i}", type="tertiary", help="Editar pieza"):
@@ -487,7 +501,6 @@ if st.session_state.get('admin', False):
                 from fpdf import FPDF
                 import base64
                 
-                # DICCIONARIO PARA TOTALES (SOLUCIONA EL ERROR DE NONLOCAL)
                 totales = {
                     "chambrana": 0.0, "riel": 0.0, "cerco": 0.0, "traslape": 0.0, 
                     "cabezal": 0.0, "zoclo": 0.0, "vinil": 0.0, "intermedio": 0.0
@@ -504,8 +517,9 @@ if st.session_state.get('admin', False):
                         num_ventanas += 1
                         diseno = p.get('diseno', "2 hojas")
                         cuadricula = p.get('cuadricula', False)
+                        t_cuad = p.get('tipo_cuadricula', "2x3")
                         
-                        v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=diseno, cuadricula=cuadricula)
+                        v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=diseno, cuadricula=cuadricula, tipo_cuadricula=t_cuad)
                         a_m, alt_l = v.calcular_cortes_marco()
                         hojas = v.calcular_hojas()
                         
@@ -531,8 +545,8 @@ if st.session_state.get('admin', False):
                                 
                                 alto_int = alto_h - v.perfil_cabezal - v.perfil_zoclo
                                 ancho_int = ancho_h - (v.perfil_cerco_traslape * 2)
-                                filas = 3
-                                cols = 4 if es_gigante else 2
+                                filas = v.filas_hoja
+                                cols = v.cols_hoja * 2 if es_gigante else v.cols_hoja
                                 
                                 alto_v = ((alto_int - (filas - 1) * v.intermedio_frente) / filas) + (v.holgura_vidrio * 2)
                                 ancho_v = ((ancho_int - (cols - 1) * v.intermedio_frente) / cols) + (v.holgura_vidrio * 2)
@@ -669,7 +683,8 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
             if p['tipo'] == "Ventana Corrediza":
                 diseno = p.get('diseno', "2 hojas")
                 cuadricula = p.get('cuadricula', False)
-                v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=diseno, cuadricula=cuadricula)
+                t_cuad = p.get('tipo_cuadricula', "2x3")
+                v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=diseno, cuadricula=cuadricula, tipo_cuadricula=t_cuad)
                 
                 a_m, alt_l = v.calcular_cortes_marco()
                 hojas = v.calcular_hojas()
@@ -698,8 +713,9 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                         # Vidrio cuadriculado
                         alto_int = alto_h - v.perfil_cabezal - v.perfil_zoclo
                         ancho_int = ancho_h - (v.perfil_cerco_traslape * 2)
-                        filas = 3
-                        cols = 4 if es_gigante else 2
+                        filas = v.filas_hoja
+                        cols = v.cols_hoja * 2 if es_gigante else v.cols_hoja
+                        
                         alto_v = ((alto_int - (filas - 1) * v.intermedio_frente) / filas) + (v.holgura_vidrio * 2)
                         ancho_v = ((ancho_int - (cols - 1) * v.intermedio_frente) / cols) + (v.holgura_vidrio * 2)
                         
