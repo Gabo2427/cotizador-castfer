@@ -42,7 +42,6 @@ def parsear_pedaceria(texto):
     try: return [float(x.strip()) for x in texto.split(',') if x.strip()]
     except: return []
 
-# OPTIMIZADOR DE ALUMINIO
 def optimizador_aluminio_taller(cortes_list, pedaceria_str, tramo_ideal=600.0):
     pedaceria = parsear_pedaceria(pedaceria_str)
     cortes_ordenados = sorted(cortes_list, key=lambda x: x["medida"], reverse=True)
@@ -72,7 +71,6 @@ def optimizador_aluminio_taller(cortes_list, pedaceria_str, tramo_ideal=600.0):
             
     return tramos_nuevos, uso_ped
 
-# MOTOR DE VIDRIO CON GUILLOTINA 2D
 def optimizador_vidrio(vidrios_list, pedaceria_str):
     pedaceria = []
     if pedaceria_str.strip():
@@ -113,14 +111,12 @@ def optimizador_vidrio(vidrios_list, pedaceria_str):
             
     def calcular_tetris(piezas_pendientes, ancho_hoja, alto_hoja):
         lista = sorted(piezas_pendientes, key=lambda p: max(p["w"], p["h"]), reverse=True)
-        
         class Node:
             def __init__(self, x, y, w, h):
                 self.x, self.y, self.w, self.h = x, y, w, h
                 self.used = False
                 self.right = None
                 self.bottom = None
-
             def insert(self, pw, ph):
                 if self.used:
                     res = self.right.insert(pw, ph)
@@ -142,7 +138,6 @@ def optimizador_vidrio(vidrios_list, pedaceria_str):
         for p in lista:
             pw, ph = p["w"], p["h"]
             colocado = False
-            
             for raiz in hojas:
                 if raiz['tree'].insert(pw, ph):
                     raiz['piezas'].append({"w": pw, "h": ph, "etiqueta": p["etiqueta"]})
@@ -152,7 +147,6 @@ def optimizador_vidrio(vidrios_list, pedaceria_str):
                     raiz['piezas'].append({"w": ph, "h": pw, "etiqueta": p["etiqueta"] + " (Rotado)"})
                     colocado = True
                     break
-                    
             if not colocado:
                 nueva_raiz = Node(0, 0, ancho_hoja, alto_hoja)
                 if nueva_raiz.insert(pw, ph):
@@ -172,16 +166,12 @@ def optimizador_vidrio(vidrios_list, pedaceria_str):
     if pendientes_exactas:
         h1 = calcular_tetris(pendientes_exactas, 180.0, 260.0)
         scenarios.append({'hojas': h1, 'ancho': 180.0, 'reducido': False, 'score': len(h1)*(180*260)})
-        
         h2 = calcular_tetris(pendientes_exactas, 230.0, 260.0)
         scenarios.append({'hojas': h2, 'ancho': 230.0, 'reducido': False, 'score': len(h2)*(230*260)})
-        
         h3 = calcular_tetris(pendientes_reducidas, 180.0, 260.0)
         scenarios.append({'hojas': h3, 'ancho': 180.0, 'reducido': True, 'score': len(h3)*(180*260)})
-        
         h4 = calcular_tetris(pendientes_reducidas, 230.0, 260.0)
         scenarios.append({'hojas': h4, 'ancho': 230.0, 'reducido': True, 'score': len(h4)*(230*260)})
-        
         scenarios.sort(key=lambda x: (x['score'], x['reducido']))
         best = scenarios[0]
     else:
@@ -252,12 +242,8 @@ with st.sidebar:
                         st.session_state.proyecto_activo_id = proyecto_cargado[0]
                         st.session_state.nombre_cliente = proyecto_cargado[1]
                         st.session_state.proyecto = json.loads(proyecto_cargado[3])
-                        
-                        try:
-                            st.session_state.anticipo = float(proyecto_cargado[5])
-                        except IndexError:
-                            st.session_state.anticipo = 0.0
-                            
+                        try: st.session_state.anticipo = float(proyecto_cargado[5])
+                        except IndexError: st.session_state.anticipo = 0.0
                         st.rerun()
             with col_borrar:
                 if st.button("🗑️ Borrar", use_container_width=True):
@@ -303,30 +289,22 @@ idx_det = opciones_detalle.index(def_detalle) if def_detalle in opciones_detalle
 with col_detalle:
     detalle_pieza = st.selectbox("Línea/Diseño:", opciones_detalle, index=idx_det)
 
-# ---- CONTROLES DINÁMICOS PARA VENTANAS ----
 if tipo_pieza == "Ventana Corrediza":
     col_diseno, col_cuadricula = st.columns(2)
     opciones_diseno = ["2 hojas", "Fijo Gigante Centro"]
     idx_diseno = opciones_diseno.index(def_diseno) if def_diseno in opciones_diseno else 0
-    
     with col_diseno:
         diseno_pieza = st.selectbox("Estilo de Apertura:", opciones_diseno, index=idx_diseno)
-        
     with col_cuadricula:
-        # Checkbox principal
         st.write("")
         cuadricula_pieza = st.checkbox("Agregar intermedios (Cuadrícula)", value=def_cuadricula)
-        
-        # El submenú solo aparece si activas la palomita
         if cuadricula_pieza:
             opciones_grid = ["2x2", "2x3", "3x2", "3x3", "3x4", "4x4"]
-            # Por defecto 2x3 (1 vertical, 2 horizontales), o el que estuviera guardado
             valor_guardado = pieza_actual.get('tipo_cuadricula', "2x3") if is_editing else "2x3"
             idx_grid = opciones_grid.index(valor_guardado) if valor_guardado in opciones_grid else 1
-            
             tipo_cuadricula_pieza = st.selectbox("Diseño (Columnas x Filas por hoja):", opciones_grid, index=idx_grid)
         else:
-            tipo_cuadricula_pieza = "2x3" # Valor por defecto oculto si no hay palomita
+            tipo_cuadricula_pieza = "2x3" 
 else:
     diseno_pieza = "2 hojas"
     cuadricula_pieza = False
@@ -344,7 +322,8 @@ with col_btn1:
         if st.button("💾 Guardar Cambios", type="primary"):
             st.session_state.proyecto[st.session_state.edit_index] = {
                 "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0,
-                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza, "tipo_cuadricula": tipo_cuadricula_pieza
+                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza, "tipo_cuadricula": tipo_cuadricula_pieza,
+                "precio": pieza_actual.get('precio', 0.0) # Conservar precio al editar
             }
             st.session_state.edit_index = None
             st.rerun()
@@ -352,7 +331,8 @@ with col_btn1:
         if st.button("➕ Agregar al proyecto"):
             st.session_state.proyecto.append({
                 "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0,
-                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza, "tipo_cuadricula": tipo_cuadricula_pieza
+                "diseno": diseno_pieza, "cuadricula": cuadricula_pieza, "tipo_cuadricula": tipo_cuadricula_pieza,
+                "precio": 0.0
             })
             st.success(f"¡{tipo_pieza} agregada!")
 
@@ -364,7 +344,7 @@ with col_btn2:
 st.write("---")
 
 # ==========================================
-# SECCIÓN 2: LISTA DEL CLIENTE E INVENTARIO
+# SECCIÓN 2: LISTA DEL CLIENTE
 # ==========================================
 with st.expander("📝 Editar piezas agregadas al proyecto", expanded=False):
     if len(st.session_state.proyecto) > 0:
@@ -407,11 +387,31 @@ if st.session_state.get('admin', False):
     total_proyecto = 0.0
     
     with st.expander("💵 Asignar precios individuales por pieza", expanded=False):
+        # ---- NUEVO: DISTRIBUIDOR DE PRESUPUESTO POR METRO CUADRADO ----
+        st.markdown("**🔄 Distribuidor Automático (Por Área en m²):**")
+        col_presup, col_btn_dist = st.columns([3, 1])
+        with col_presup:
+            presupuesto_global = st.number_input("Presupuesto Total a repartir ($):", min_value=0.0, step=1000.0, value=0.0)
+        with col_btn_dist:
+            st.write("") 
+            if st.button("Repartir", use_container_width=True):
+                area_total = sum([(p['ancho'] * p['alto']) for p in st.session_state.proyecto])
+                if area_total > 0 and presupuesto_global > 0:
+                    precio_por_m2 = presupuesto_global / area_total
+                    for i in range(len(st.session_state.proyecto)):
+                        area_pieza = st.session_state.proyecto[i]['ancho'] * st.session_state.proyecto[i]['alto']
+                        st.session_state.proyecto[i]['precio'] = round(area_pieza * precio_por_m2, 2)
+                    st.rerun()
+                elif area_total == 0:
+                    st.warning("No hay piezas o no tienen área.")
+        
+        st.write("---")
         st.markdown("**Ingresa el precio final (material e instalación) por cada pieza:**")
         for i, pieza in enumerate(st.session_state.proyecto):
             col_texto, col_precio = st.columns([3, 1])
             with col_texto:
-                st.markdown(f"<br>**Pieza {i+1}:** {pieza['tipo']} ({round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm)", unsafe_allow_html=True)
+                area = pieza['ancho'] * pieza['alto']
+                st.markdown(f"<br>**Pieza {i+1}:** {pieza['tipo']} ({round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm) - *{round(area, 2)} m²*", unsafe_allow_html=True)
             with col_precio:
                 precio_actual = pieza.get('precio', 0.0)
                 precio_pieza = st.number_input("Precio ($)", min_value=0.0, step=100.0, value=float(precio_actual), format="%.2f", key=f"precio_{i}")
@@ -503,9 +503,9 @@ if st.session_state.get('admin', False):
                 
                 totales = {
                     "chambrana": 0.0, "riel": 0.0, "cerco": 0.0, "traslape": 0.0, 
-                    "cabezal": 0.0, "zoclo": 0.0, "vinil": 0.0, "intermedio": 0.0
+                    "cabezal": 0.0, "zoclo": 0.0, "vinil": 0.0, "intermedio": 0.0,
+                    "jaladera": 0, "carretilla": 0
                 }
-                num_ventanas = 0
                 lista_medidas = []
                 todos_los_vidrios_pdf = []
 
@@ -514,10 +514,17 @@ if st.session_state.get('admin', False):
                     lista_medidas.append(texto_medida)
 
                     if p['tipo'] == "Ventana Corrediza":
-                        num_ventanas += 1
                         diseno = p.get('diseno', "2 hojas")
                         cuadricula = p.get('cuadricula', False)
                         t_cuad = p.get('tipo_cuadricula', "2x3")
+                        
+                        # --- NUEVA LÓGICA DE HERRAJES ---
+                        if diseno == "Fijo Gigante Centro":
+                            totales["jaladera"] += 2
+                            totales["carretilla"] += 4
+                        else:
+                            totales["jaladera"] += 1
+                            totales["carretilla"] += 2
                         
                         v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=diseno, cuadricula=cuadricula, tipo_cuadricula=t_cuad)
                         a_m, alt_l = v.calcular_cortes_marco()
@@ -612,10 +619,13 @@ if st.session_state.get('admin', False):
                 pdf.cell(0, 8, " 2. HERRAJES Y ACCESORIOS", ln=True, fill=True)
                 pdf.ln(4)
                 pdf.set_font("Arial", '', 11)
-                if num_ventanas > 0:
-                    pdf.cell(0, 8, f"[   ]   {num_ventanas} Jaladeras", ln=True)
-                    pdf.cell(0, 8, f"[   ]   {num_ventanas * 2} Carretillas", ln=True)
-                    pdf.cell(0, 8, f"[   ]   {num_ventanas} Botes de Sellador", ln=True)
+                
+                # --- HERRAJES IMPRESOS DINÁMICAMENTE ---
+                if totales["jaladera"] > 0:
+                    pdf.cell(0, 8, f"[   ]   {totales['jaladera']} Jaladeras", ln=True)
+                    pdf.cell(0, 8, f"[   ]   {totales['carretilla']} Carretillas", ln=True)
+                    botes = max(1, math.ceil(totales['vinil'] / 1000.0)) # Un bote por cada aprox 10 mts de vinil o ventanas, formula básica.
+                    pdf.cell(0, 8, f"[   ]   {botes} Botes de Sellador", ln=True)
                     pdf.cell(0, 8, f"[   ]   {math.ceil(totales['vinil'] / 100.0)} Metros lineales de Vinil", ln=True)
                 
                 pdf.ln(6)
@@ -710,7 +720,6 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                         if ints["horizontales"]:
                             agregar_cortes(cortes_intermedio, [round(x*100, 1) for x in ints["horizontales"]], f"Horz-{lbl}")
                             
-                        # Vidrio cuadriculado
                         alto_int = alto_h - v.perfil_cabezal - v.perfil_zoclo
                         ancho_int = ancho_h - (v.perfil_cerco_traslape * 2)
                         filas = v.filas_hoja
