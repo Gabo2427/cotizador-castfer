@@ -486,7 +486,12 @@ if st.session_state.get('admin', False):
             try:
                 from fpdf import FPDF
                 import base64
-                tot_chambrana = tot_riel = tot_cerco = tot_traslape = tot_cabezal = tot_zoclo = tot_vinil = tot_intermedio = 0.0
+                
+                # DICCIONARIO PARA TOTALES (SOLUCIONA EL ERROR DE NONLOCAL)
+                totales = {
+                    "chambrana": 0.0, "riel": 0.0, "cerco": 0.0, "traslape": 0.0, 
+                    "cabezal": 0.0, "zoclo": 0.0, "vinil": 0.0, "intermedio": 0.0
+                }
                 num_ventanas = 0
                 lista_medidas = []
                 todos_los_vidrios_pdf = []
@@ -504,48 +509,42 @@ if st.session_state.get('admin', False):
                         a_m, alt_l = v.calcular_cortes_marco()
                         hojas = v.calcular_hojas()
                         
-                        tot_chambrana += (alt_l * 2 + a_m) * 100
-                        tot_riel += (a_m) * 100
+                        totales["chambrana"] += (alt_l * 2 + a_m) * 100
+                        totales["riel"] += (a_m) * 100
                         
-                        # FUNCIÓN INTERNA PARA PROCESAR CADA HOJA Y SUMAR MATERIALES
                         def procesar_hoja_proveedor(alto_h, ancho_h, es_gigante):
-                            nonlocal tot_cerco, tot_traslape, tot_cabezal, tot_zoclo, tot_intermedio, tot_vinil
-                            
-                            tot_cabezal += ancho_h * 100
-                            tot_zoclo += ancho_h * 100
+                            totales["cabezal"] += ancho_h * 100
+                            totales["zoclo"] += ancho_h * 100
                             if es_gigante:
-                                tot_cerco += (alto_h * 2) * 100 # La hoja gigante lleva 2 cercos
+                                totales["cerco"] += (alto_h * 2) * 100 
                             else:
-                                tot_cerco += alto_h * 100
-                                tot_traslape += alto_h * 100
+                                totales["cerco"] += alto_h * 100
+                                totales["traslape"] += alto_h * 100
                                 
                             luz_ancho = (ancho_h * 100) - 10.0
                             luz_alto = (alto_h * 100) - 9.0
                             
-                            # INTERMEDIOS Y VIDRIOS
                             if cuadricula:
                                 ints = v.calcular_intermedios_aluminio(alto_h, ancho_h, es_gigante)
-                                tot_intermedio += sum(ints["verticales"]) * 100
-                                tot_intermedio += sum(ints["horizontales"]) * 100
+                                totales["intermedio"] += sum(ints["verticales"]) * 100
+                                totales["intermedio"] += sum(ints["horizontales"]) * 100
                                 
                                 alto_int = alto_h - v.perfil_cabezal - v.perfil_zoclo
                                 ancho_int = ancho_h - (v.perfil_cerco_traslape * 2)
                                 filas = 3
                                 cols = 4 if es_gigante else 2
                                 
-                                # Cálculo exacto descontando los 3.6cm del intermedio
                                 alto_v = ((alto_int - (filas - 1) * v.intermedio_frente) / filas) + (v.holgura_vidrio * 2)
                                 ancho_v = ((ancho_int - (cols - 1) * v.intermedio_frente) / cols) + (v.holgura_vidrio * 2)
                                 
-                                tot_vinil += ((ancho_v*100) + (alto_v*100)) * 2 * (filas * cols)
+                                totales["vinil"] += ((ancho_v*100) + (alto_v*100)) * 2 * (filas * cols)
                                 for _ in range(filas * cols):
                                     todos_los_vidrios_pdf.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": f"P{i+1} (Cuad)"})
                             else:
-                                tot_vinil += (luz_ancho + luz_alto) * 2
+                                totales["vinil"] += (luz_ancho + luz_alto) * 2
                                 a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
                                 todos_los_vidrios_pdf.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{i+1}"})
                                 
-                        # Procesar según el diseño
                         if diseno == "2 hojas":
                             procesar_hoja_proveedor(hojas["fija"][0], hojas["fija"][1], False)
                             procesar_hoja_proveedor(hojas["corrediza"][0], hojas["corrediza"][1], False)
@@ -586,13 +585,13 @@ if st.session_state.get('admin', False):
                         tiras = math.ceil(total_cm / 600.0)
                         pdf.cell(0, 8, f"[   ]   {tiras} {nombre} de 6 mts   (Total neto: {round(total_cm/100.0,2)} mts)", ln=True)
 
-                agregar_perfil("Chambranas", tot_chambrana)
-                agregar_perfil("Rieles", tot_riel)
-                agregar_perfil("Cercos", tot_cerco)
-                agregar_perfil("Traslapes", tot_traslape)
-                agregar_perfil("Cabezales", tot_cabezal)
-                agregar_perfil("Zoclos", tot_zoclo)
-                agregar_perfil("Intermedios", tot_intermedio)
+                agregar_perfil("Chambranas", totales["chambrana"])
+                agregar_perfil("Rieles", totales["riel"])
+                agregar_perfil("Cercos", totales["cerco"])
+                agregar_perfil("Traslapes", totales["traslape"])
+                agregar_perfil("Cabezales", totales["cabezal"])
+                agregar_perfil("Zoclos", totales["zoclo"])
+                agregar_perfil("Intermedios", totales["intermedio"])
                 pdf.ln(4)
 
                 pdf.set_font("Arial", 'B', 12)
@@ -603,7 +602,7 @@ if st.session_state.get('admin', False):
                     pdf.cell(0, 8, f"[   ]   {num_ventanas} Jaladeras", ln=True)
                     pdf.cell(0, 8, f"[   ]   {num_ventanas * 2} Carretillas", ln=True)
                     pdf.cell(0, 8, f"[   ]   {num_ventanas} Botes de Sellador", ln=True)
-                    pdf.cell(0, 8, f"[   ]   {math.ceil(tot_vinil / 100.0)} Metros lineales de Vinil", ln=True)
+                    pdf.cell(0, 8, f"[   ]   {math.ceil(totales['vinil'] / 100.0)} Metros lineales de Vinil", ln=True)
                 
                 pdf.ln(6)
                 pdf.set_font("Arial", 'B', 12)
