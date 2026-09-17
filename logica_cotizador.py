@@ -2,7 +2,7 @@
 # LÓGICA EXCLUSIVA PARA VENTANAS
 # =======================================================
 class Ventana:
-    def __init__(self, ancho, alto, linea_aluminio, color, division_horizontal=False, diseno="2 hojas", cuadricula=False):
+    def __init__(self, ancho, alto, linea_aluminio, color, division_horizontal=False, diseno="2 hojas", cuadricula=False, tipo_cuadricula="2x3"):
         self.ancho = ancho
         self.alto = alto
         self.linea_aluminio = linea_aluminio
@@ -10,7 +10,21 @@ class Ventana:
         self.division_horizontal = division_horizontal
         self.diseno = diseno
         self.cuadricula = cuadricula
+        self.tipo_cuadricula = tipo_cuadricula
         
+        # --- TRADUCTOR DE CUADRÍCULA (Ej. "2x3" -> 2 Columnas, 3 Filas) ---
+        if self.cuadricula:
+            try:
+                c_str, r_str = self.tipo_cuadricula.split('x')
+                self.cols_hoja = int(c_str)
+                self.filas_hoja = int(r_str)
+            except:
+                self.cols_hoja = 2
+                self.filas_hoja = 3
+        else:
+            self.cols_hoja = 1
+            self.filas_hoja = 1
+
         # --- MEDIDAS GENERALES ---
         self.holgura_vidrio = 0.005 # 0.5 cm por lado
         self.intermedio_frente = 0.036 # 3.6 cm viéndolo de frente
@@ -63,9 +77,24 @@ class Ventana:
         corte_alto = alto_fija - 0.005
         return round(corte_alto, 3), round(corte_ancho, 3)
 
+    def calcular_hojas(self):
+        # Función empaquetada para app.py
+        alto_fija, ancho_fija = self.calcular_hoja_fija()
+        alto_corr, ancho_corr = self.calcular_hoja_corrediza()
+        
+        if self.diseno == "2 hojas":
+            return {
+                "fija": (round(alto_fija, 3), round(ancho_fija, 3)),
+                "corrediza": (round(alto_corr, 3), round(ancho_corr, 3))
+            }
+        elif self.diseno == "Fijo Gigante Centro":
+            return {
+                "fija_gigante": (round(alto_fija, 3), round(ancho_fija, 3)),
+                "corrediza_izq": (round(alto_corr, 3), round(ancho_corr, 3)),
+                "corrediza_der": (round(alto_corr, 3), round(ancho_corr, 3))
+            }
+
     def calcular_vidrio(self, corte_alto_hoja, corte_ancho_hoja):
-        # Mantenemos esta función intacta para que no rompa app.py 
-        # (El cálculo especializado de vidrio de 6 cuadros lo haremos en el siguiente paso)
         alto_interior = corte_alto_hoja - self.perfil_cabezal - self.perfil_zoclo
         ancho_interior = corte_ancho_hoja - (self.perfil_cerco_traslape * 2)
         
@@ -86,14 +115,19 @@ class Ventana:
         largo_horizontal = ancho_interior + (self.holgura_vidrio * 2)
         
         if not es_gigante:
+            num_vert = self.cols_hoja - 1
+            num_horz = self.filas_hoja - 1
             return {
-                "verticales": [round(largo_vertical, 3)] * 1,
-                "horizontales": [round(largo_horizontal, 3)] * 2
+                "verticales": [round(largo_vertical, 3)] * num_vert,
+                "horizontales": [round(largo_horizontal, 3)] * num_horz
             }
         else:
+            # La hoja gigante tiene el doble de columnas
+            num_vert = (self.cols_hoja * 2) - 1
+            num_horz = self.filas_hoja - 1
             return {
-                "verticales": [round(largo_vertical, 3)] * 3,
-                "horizontales": [round(largo_horizontal, 3)] * 2
+                "verticales": [round(largo_vertical, 3)] * num_vert,
+                "horizontales": [round(largo_horizontal, 3)] * num_horz
             }
 
 # =======================================================
