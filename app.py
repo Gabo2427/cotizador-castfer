@@ -499,9 +499,10 @@ if st.session_state.get('admin', False):
                 pdf_bytes = pdf.output(dest='S').encode('latin-1')
                 b64 = base64.b64encode(pdf_bytes).decode()
                 
-                # --- VISOR INTEGRADO ---
+                # --- VISOR INTEGRADO USANDO EMBED (EVITA BLOQUEO DE CHROME) ---
                 with st.expander("👁️ Previsualizar Recibo", expanded=True):
-                    st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf"></iframe>', unsafe_allow_html=True)
+                    pdf_display = f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf">'
+                    st.markdown(pdf_display, unsafe_allow_html=True)
                 
                 href = f'<a href="data:application/pdf;base64,{b64}" download="Cotizacion_CASTFER_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #ff4b4b; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">📥 Descargar Recibo PDF</a>'
                 st.markdown(href, unsafe_allow_html=True)
@@ -663,9 +664,10 @@ if st.session_state.get('admin', False):
                 pdf_bytes = pdf.output(dest='S').encode('latin-1')
                 b64 = base64.b64encode(pdf_bytes).decode()
                 
-                # --- VISOR INTEGRADO ---
+                # --- VISOR INTEGRADO USANDO EMBED ---
                 with st.expander("👁️ Previsualizar Lista de Compras", expanded=True):
-                    st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf"></iframe>', unsafe_allow_html=True)
+                    pdf_display = f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf">'
+                    st.markdown(pdf_display, unsafe_allow_html=True)
 
                 href = f'<a href="data:application/pdf;base64,{b64}" download="Compras_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #6c757d; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>'
                 st.markdown(href, unsafe_allow_html=True)
@@ -846,9 +848,10 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
         b64 = base64.b64encode(pdf_bytes).decode()
         
-        # --- VISOR INTEGRADO ---
+        # --- VISOR INTEGRADO USANDO EMBED ---
         with st.expander("👁️ Previsualizar Guía de Cortes (Taller)", expanded=True):
-            st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="700" type="application/pdf"></iframe>', unsafe_allow_html=True)
+            pdf_display = f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="700" type="application/pdf">'
+            st.markdown(pdf_display, unsafe_allow_html=True)
 
         href = f'<a href="data:application/pdf;base64,{b64}" download="Guia_Cortes_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 12px; background-color: #007bff; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%; font-size: 16px; font-weight: bold;">📥 Descargar Guía de Cortes para Taller</a>'
         
