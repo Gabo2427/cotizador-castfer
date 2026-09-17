@@ -250,7 +250,6 @@ with st.sidebar:
                     db_manager.borrar_proyecto(seleccion)
                     st.rerun()
         
-        # --- BOTÓN MAESTRO PARA CREAR NUEVO PROYECTO ---
         st.write("---")
         if st.button("✨ Crear Nuevo Proyecto (Limpiar Todo)", type="primary", use_container_width=True):
             st.session_state.proyecto = []
@@ -410,7 +409,6 @@ if st.session_state.get('admin', False):
                     precio_por_m2 = presupuesto_global / area_total
                     for i in range(len(st.session_state.proyecto)):
                         area_pieza = st.session_state.proyecto[i]['ancho'] * st.session_state.proyecto[i]['alto']
-                        # Modificación de redondeo aplicada aquí:
                         st.session_state.proyecto[i]['precio'] = float(round(area_pieza * precio_por_m2))
                     st.rerun()
                 elif area_total == 0:
@@ -456,7 +454,7 @@ if st.session_state.get('admin', False):
     st.subheader("🖨️ Generación de Documentos")
     col_pdf1, col_pdf2 = st.columns(2)
     
-    # ==================== BOTÓN 1: RECIBO ====================
+    # ==================== BOTÓN 1: RECIBO CON VISTA PREVIA ====================
     with col_pdf1:
         if st.button("📄 Recibo para Cliente (PDF)", type="primary", use_container_width=True):
             try:
@@ -500,12 +498,17 @@ if st.session_state.get('admin', False):
 
                 pdf_bytes = pdf.output(dest='S').encode('latin-1')
                 b64 = base64.b64encode(pdf_bytes).decode()
+                
+                # --- VISOR INTEGRADO ---
+                with st.expander("👁️ Previsualizar Recibo", expanded=True):
+                    st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf"></iframe>', unsafe_allow_html=True)
+                
                 href = f'<a href="data:application/pdf;base64,{b64}" download="Cotizacion_CASTFER_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #ff4b4b; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">📥 Descargar Recibo PDF</a>'
                 st.markdown(href, unsafe_allow_html=True)
             except Exception as e:
                 st.error("⚠️ Error generando PDF.")
 
-    # ==================== BOTÓN 2: PROVEEDOR ====================
+    # ==================== BOTÓN 2: PROVEEDOR CON VISTA PREVIA ====================
     with col_pdf2:
         if st.button("🛒 Lista Material Proveedor (PDF)", type="secondary", use_container_width=True):
             try:
@@ -659,6 +662,11 @@ if st.session_state.get('admin', False):
 
                 pdf_bytes = pdf.output(dest='S').encode('latin-1')
                 b64 = base64.b64encode(pdf_bytes).decode()
+                
+                # --- VISOR INTEGRADO ---
+                with st.expander("👁️ Previsualizar Lista de Compras", expanded=True):
+                    st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf"></iframe>', unsafe_allow_html=True)
+
                 href = f'<a href="data:application/pdf;base64,{b64}" download="Compras_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #6c757d; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>'
                 st.markdown(href, unsafe_allow_html=True)
             except Exception as e:
@@ -667,7 +675,7 @@ if st.session_state.get('admin', False):
     st.write("---")
 
 # ==========================================
-# SECCIÓN 4: BOTÓN 3 - GUÍA DE CORTES TALLER
+# SECCIÓN 4: BOTÓN 3 - GUÍA DE CORTES TALLER (CON VISTA PREVIA)
 # ==========================================
 with st.expander("♻️ ¿Tienes pedacería en el taller? (Opcional)"):
     st.info("Ingresa centímetros separados por comas (ej: 120, 80). Para vidrio Ancho x Alto (ej: 90x60).")
@@ -837,6 +845,11 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
 
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
         b64 = base64.b64encode(pdf_bytes).decode()
+        
+        # --- VISOR INTEGRADO ---
+        with st.expander("👁️ Previsualizar Guía de Cortes (Taller)", expanded=True):
+            st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="700" type="application/pdf"></iframe>', unsafe_allow_html=True)
+
         href = f'<a href="data:application/pdf;base64,{b64}" download="Guia_Cortes_{cliente_pdf}.pdf" target="_blank" style="text-decoration: none; padding: 12px; background-color: #007bff; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%; font-size: 16px; font-weight: bold;">📥 Descargar Guía de Cortes para Taller</a>'
         
         st.markdown(href, unsafe_allow_html=True)
