@@ -249,6 +249,17 @@ with st.sidebar:
                 if st.button("🗑️ Borrar", use_container_width=True):
                     db_manager.borrar_proyecto(seleccion)
                     st.rerun()
+        
+        # --- BOTÓN MAESTRO PARA CREAR NUEVO PROYECTO ---
+        st.write("---")
+        if st.button("✨ Crear Nuevo Proyecto (Limpiar Todo)", type="primary", use_container_width=True):
+            st.session_state.proyecto = []
+            st.session_state.edit_index = None
+            st.session_state.proyecto_activo_id = None
+            st.session_state.nombre_cliente = ""
+            st.session_state.costo_total = 0.0
+            st.session_state.anticipo = 0.0
+            st.rerun()
 
 # ==========================================
 # LOGO Y ENCABEZADO PRINCIPAL
@@ -323,7 +334,7 @@ with col_btn1:
             st.session_state.proyecto[st.session_state.edit_index] = {
                 "tipo": tipo_pieza, "detalle": detalle_pieza, "ancho": ancho_input_cm / 100.0, "alto": alto_input_cm / 100.0,
                 "diseno": diseno_pieza, "cuadricula": cuadricula_pieza, "tipo_cuadricula": tipo_cuadricula_pieza,
-                "precio": pieza_actual.get('precio', 0.0) # Conservar precio al editar
+                "precio": pieza_actual.get('precio', 0.0)
             }
             st.session_state.edit_index = None
             st.rerun()
@@ -387,7 +398,6 @@ if st.session_state.get('admin', False):
     total_proyecto = 0.0
     
     with st.expander("💵 Asignar precios individuales por pieza", expanded=False):
-        # ---- NUEVO: DISTRIBUIDOR DE PRESUPUESTO POR METRO CUADRADO ----
         st.markdown("**🔄 Distribuidor Automático (Por Área en m²):**")
         col_presup, col_btn_dist = st.columns([3, 1])
         with col_presup:
@@ -400,6 +410,7 @@ if st.session_state.get('admin', False):
                     precio_por_m2 = presupuesto_global / area_total
                     for i in range(len(st.session_state.proyecto)):
                         area_pieza = st.session_state.proyecto[i]['ancho'] * st.session_state.proyecto[i]['alto']
+                        # Modificación de redondeo aplicada aquí:
                         st.session_state.proyecto[i]['precio'] = float(round(area_pieza * precio_por_m2))
                     st.rerun()
                 elif area_total == 0:
@@ -518,7 +529,6 @@ if st.session_state.get('admin', False):
                         cuadricula = p.get('cuadricula', False)
                         t_cuad = p.get('tipo_cuadricula', "2x3")
                         
-                        # --- NUEVA LÓGICA DE HERRAJES ---
                         if diseno == "Fijo Gigante Centro":
                             totales["jaladera"] += 2
                             totales["carretilla"] += 4
@@ -620,11 +630,10 @@ if st.session_state.get('admin', False):
                 pdf.ln(4)
                 pdf.set_font("Arial", '', 11)
                 
-                # --- HERRAJES IMPRESOS DINÁMICAMENTE ---
                 if totales["jaladera"] > 0:
                     pdf.cell(0, 8, f"[   ]   {totales['jaladera']} Jaladeras", ln=True)
                     pdf.cell(0, 8, f"[   ]   {totales['carretilla']} Carretillas", ln=True)
-                    botes = max(1, math.ceil(totales['vinil'] / 1000.0)) # Un bote por cada aprox 10 mts de vinil o ventanas, formula básica.
+                    botes = max(1, math.ceil(totales['vinil'] / 1000.0)) 
                     pdf.cell(0, 8, f"[   ]   {botes} Botes de Sellador", ln=True)
                     pdf.cell(0, 8, f"[   ]   {math.ceil(totales['vinil'] / 100.0)} Metros lineales de Vinil", ln=True)
                 
