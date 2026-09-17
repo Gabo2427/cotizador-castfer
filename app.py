@@ -400,7 +400,7 @@ if st.session_state.get('admin', False):
                     precio_por_m2 = presupuesto_global / area_total
                     for i in range(len(st.session_state.proyecto)):
                         area_pieza = st.session_state.proyecto[i]['ancho'] * st.session_state.proyecto[i]['alto']
-                        st.session_state.proyecto[i]['precio'] = round(area_pieza * precio_por_m2, 2)
+                        st.session_state.proyecto[i]['precio'] = float(round(area_pieza * precio_por_m2))
                     st.rerun()
                 elif area_total == 0:
                     st.warning("No hay piezas o no tienen área.")
