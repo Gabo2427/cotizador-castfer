@@ -44,31 +44,59 @@ def parsear_pedaceria(texto):
 
 def optimizador_aluminio_taller(cortes_list, pedaceria_str, tramo_ideal=600.0):
     pedaceria = parsear_pedaceria(pedaceria_str)
-    cortes_ordenados = sorted(cortes_list, key=lambda x: x["medida"], reverse=True)
-    tramos_nuevos = []
-    uso_ped = {i: {"tamano": p, "usados": []} for i, p in enumerate(pedaceria)}
     
-    for corte_dict in cortes_ordenados:
-        corte_real = corte_dict["medida"] + 0.3 
-        colocado = False
-        
-        for i in range(len(pedaceria)):
-            usado_ahora = sum([u["medida"] for u in uso_ped[i]["usados"]]) + (len(uso_ped[i]["usados"]) * 0.3)
-            if uso_ped[i]["tamano"] - usado_ahora >= corte_real:
-                uso_ped[i]["usados"].append(corte_dict)
-                colocado = True
-                break
-        if colocado: continue
-        
-        for tramo in tramos_nuevos:
-            usado_ahora = sum([u["medida"] for u in tramo]) + (len(tramo) * 0.3)
-            if tramo_ideal - usado_ahora >= corte_real:
-                tramo.append(corte_dict)
-                colocado = True
-                break
-        
-        if not colocado: tramos_nuevos.append([corte_dict])
+    # GROSOR DEL DISCO DE CORTE EN CENTÍMETROS (3 milímetros)
+    DESPERDICIO_SIERRA = 0.3 
+    
+    # 1. Ordenar cortes de mayor a menor.
+    cortes_pendientes = sorted(cortes_list, key=lambda x: x["medida"], reverse=True)
+
+    # 2. Ordenar la pedacería de menor a mayor.
+    pedaceria_ordenada = sorted(pedaceria)
+    uso_ped = {i: {"tamano": p, "usados": []} for i, p in enumerate(pedaceria_ordenada)}
+
+    def buscar_mejor_ajuste(cortes, capacidad):
+        cap_int = int(round(capacidad * 10))
+        dp = [0] * (cap_int + 1)
+        elecciones = [[] for _ in range(cap_int + 1)]
+
+        for i, c in enumerate(cortes):
+            peso = int(round((c["medida"] + DESPERDICIO_SIERRA) * 10))
+            if peso > cap_int:
+                continue
             
+            for w in range(cap_int, peso - 1, -1):
+                if dp[w - peso] + peso > dp[w]:
+                    dp[w] = dp[w - peso] + peso
+                    elecciones[w] = elecciones[w - peso] + [i]
+
+        return elecciones[cap_int]
+
+    # FASE A: RELLENAR LA PEDACERÍA
+    for i in range(len(pedaceria_ordenada)):
+        if not cortes_pendientes: break
+        capacidad_ped = pedaceria_ordenada[i]
+        
+        mejores_idx = buscar_mejor_ajuste(cortes_pendientes, capacidad_ped)
+
+        for idx in sorted(mejores_idx, reverse=True):
+            uso_ped[i]["usados"].append(cortes_pendientes.pop(idx))
+
+    # FASE B: RELLENAR TRAMOS NUEVOS (6.00 METROS)
+    tramos_nuevos = []
+    while cortes_pendientes:
+        mejores_idx = buscar_mejor_ajuste(cortes_pendientes, tramo_ideal)
+
+        if not mejores_idx:
+            tramos_nuevos.append([cortes_pendientes.pop(0)])
+            continue
+
+        tramo_actual = []
+        for idx in sorted(mejores_idx, reverse=True):
+            tramo_actual.append(cortes_pendientes.pop(idx))
+
+        tramos_nuevos.append(tramo_actual)
+
     return tramos_nuevos, uso_ped
 
 def optimizador_vidrio(vidrios_list, pedaceria_str):
@@ -388,6 +416,32 @@ with st.expander("📝 Editar piezas agregadas al proyecto", expanded=False):
                     st.rerun()
 
 # ==========================================
+# SECCIÓN 2.5: PRODUCCIÓN POR FASES (ENTREGAS PARCIALES)
+# ==========================================
+st.write("---")
+st.subheader("🚧 Producción por Fases")
+st.info("Si el albañil aún no termina los vanos, activa esta opción para fabricar y cotizar solo algunas piezas del proyecto maestro.")
+
+usar_fases = st.checkbox("Activar fabricación parcial (Por Fases)")
+proyecto_activo = []
+
+if usar_fases:
+    st.markdown("**Selecciona las piezas que vas a fabricar en esta etapa:**")
+    for i, pieza in enumerate(st.session_state.proyecto):
+        if st.checkbox(f"Incluir Pieza {i+1}: {pieza['tipo']} ({round(pieza['ancho']*100,1)}x{round(pieza['alto']*100,1)}cm)", value=True, key=f"fase_{i}"):
+            pieza_con_idx = pieza.copy()
+            pieza_con_idx['idx_original'] = i # Guardamos su número original
+            proyecto_activo.append(pieza_con_idx)
+else:
+    for i, pieza in enumerate(st.session_state.proyecto):
+        pieza_con_idx = pieza.copy()
+        pieza_con_idx['idx_original'] = i
+        proyecto_activo.append(pieza_con_idx)
+
+if len(proyecto_activo) == 0 and len(st.session_state.proyecto) > 0:
+    st.warning("⚠️ No has seleccionado ninguna pieza para fabricar.")
+
+# ==========================================
 # SECCIÓN 3: FINANZAS E IMPRESIÓN 
 # ==========================================
 if st.session_state.get('admin', False):
@@ -416,15 +470,17 @@ if st.session_state.get('admin', False):
         
         st.write("---")
         st.markdown("**Ingresa el precio final (material e instalación) por cada pieza:**")
-        for i, pieza in enumerate(st.session_state.proyecto):
+        
+        for i, pieza in enumerate(proyecto_activo):
+            idx_real = pieza['idx_original']
             col_texto, col_precio = st.columns([3, 1])
             with col_texto:
                 area = pieza['ancho'] * pieza['alto']
-                st.markdown(f"<br>**Pieza {i+1}:** {pieza['tipo']} ({round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm) - *{round(area, 2)} m²*", unsafe_allow_html=True)
+                st.markdown(f"<br>**Pieza {idx_real+1} (Fase Actual):** {pieza['tipo']} ({round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm) - *{round(area, 2)} m²*", unsafe_allow_html=True)
             with col_precio:
                 precio_actual = pieza.get('precio', 0.0)
-                precio_pieza = st.number_input("Precio ($)", min_value=0.0, step=100.0, value=float(precio_actual), format="%.2f", key=f"precio_{i}")
-                st.session_state.proyecto[i]['precio'] = precio_pieza
+                precio_pieza = st.number_input("Precio ($)", min_value=0.0, step=100.0, value=float(precio_actual), format="%.2f", key=f"precio_fase_{idx_real}")
+                st.session_state.proyecto[idx_real]['precio'] = precio_pieza
                 total_proyecto += precio_pieza
     
     st.session_state.costo_total = total_proyecto
@@ -478,10 +534,11 @@ if st.session_state.get('admin', False):
                 pdf.ln(5)
                 
                 pdf.set_font("Arial", '', 10)
-                for i, pieza in enumerate(st.session_state.proyecto):
+                for i, pieza in enumerate(proyecto_activo):
+                    num_pieza = pieza['idx_original'] + 1
                     txt_dis = f" - {pieza.get('diseno', '2 hojas')}" if pieza['tipo'] == "Ventana Corrediza" else ""
-                    texto_pieza = f"Pieza {i+1}: {pieza['tipo']} {txt_dis} ({round(pieza['ancho']*100,1)} x {round(pieza['alto']*100,1)} cm)"
-                    precio_ind = st.session_state.get(f"precio_{i}", 0.0)
+                    texto_pieza = f"Pieza {num_pieza}: {pieza['tipo']} {txt_dis} ({round(pieza['ancho']*100,1)} x {round(pieza['alto']*100,1)} cm)"
+                    precio_ind = st.session_state.get(f"precio_fase_{pieza['idx_original']}", pieza.get('precio', 0.0))
                     pdf.cell(140, 8, texto_pieza, border=1)
                     pdf.cell(50, 8, f"${precio_ind:,.2f}", border=1, ln=True, align='R')
                 
@@ -499,7 +556,6 @@ if st.session_state.get('admin', False):
                 pdf_bytes = pdf.output(dest='S').encode('latin-1')
                 b64 = base64.b64encode(pdf_bytes).decode()
                 
-                # --- VISOR INTEGRADO USANDO EMBED (EVITA BLOQUEO DE CHROME) ---
                 with st.expander("👁️ Previsualizar Recibo", expanded=True):
                     pdf_display = f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf">'
                     st.markdown(pdf_display, unsafe_allow_html=True)
@@ -524,8 +580,9 @@ if st.session_state.get('admin', False):
                 lista_medidas = []
                 todos_los_vidrios_pdf = []
 
-                for i, p in enumerate(st.session_state.proyecto):
-                    texto_medida = f"P{i+1}: {round(p['ancho']*100,1)}x{round(p['alto']*100,1)}cm"
+                for i, p in enumerate(proyecto_activo):
+                    num_pieza = p['idx_original'] + 1
+                    texto_medida = f"P{num_pieza}: {round(p['ancho']*100,1)}x{round(p['alto']*100,1)}cm"
                     lista_medidas.append(texto_medida)
 
                     if p['tipo'] == "Ventana Corrediza":
@@ -574,11 +631,11 @@ if st.session_state.get('admin', False):
                                 
                                 totales["vinil"] += ((ancho_v*100) + (alto_v*100)) * 2 * (filas * cols)
                                 for _ in range(filas * cols):
-                                    todos_los_vidrios_pdf.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": f"P{i+1} (Cuad)"})
+                                    todos_los_vidrios_pdf.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": f"P{num_pieza} (Cuad)"})
                             else:
                                 totales["vinil"] += (luz_ancho + luz_alto) * 2
                                 a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
-                                todos_los_vidrios_pdf.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{i+1}"})
+                                todos_los_vidrios_pdf.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}"})
                                 
                         if diseno == "2 hojas":
                             procesar_hoja_proveedor(hojas["fija"][0], hojas["fija"][1], False)
@@ -591,7 +648,7 @@ if st.session_state.get('admin', False):
                     elif p['tipo'] == "Puerta":
                         puerta = Puerta(p['ancho'], p['alto'], p['detalle'], "Blanco")
                         ancho_r, alto_r, cant_duelas = puerta.calcular_relleno()
-                        todos_los_vidrios_pdf.append({"medida": f"{round(ancho_r*100, 1)} x {round(alto_r*100, 1)}", "etiqueta": f"P{i+1}"})
+                        todos_los_vidrios_pdf.append({"medida": f"{round(ancho_r*100, 1)} x {round(alto_r*100, 1)}", "etiqueta": f"P{num_pieza}"})
 
                 pdf = FPDF()
                 pdf.add_page()
@@ -664,7 +721,6 @@ if st.session_state.get('admin', False):
                 pdf_bytes = pdf.output(dest='S').encode('latin-1')
                 b64 = base64.b64encode(pdf_bytes).decode()
                 
-                # --- VISOR INTEGRADO USANDO EMBED ---
                 with st.expander("👁️ Previsualizar Lista de Compras", expanded=True):
                     pdf_display = f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf">'
                     st.markdown(pdf_display, unsafe_allow_html=True)
@@ -707,8 +763,8 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
         def agregar_cortes(lista, medidas, etiqueta):
             for m in medidas: lista.append({"medida": m, "etiqueta": etiqueta})
         
-        for i, p in enumerate(st.session_state.proyecto):
-            num_pieza = i + 1  
+        for i, p in enumerate(proyecto_activo):
+            num_pieza = p['idx_original'] + 1  
             if p['tipo'] == "Ventana Corrediza":
                 diseno = p.get('diseno', "2 hojas")
                 cuadricula = p.get('cuadricula', False)
@@ -749,9 +805,9 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                         
                         for _ in range(filas * cols):
                             todos_los_vidrios_taller.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": f"{lbl}"})
-                    else:
-                        a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
-                        todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl})
+                else:
+                    a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
+                    todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl})
 
                 if diseno == "2 hojas":
                     procesar_cortes_hoja("Fija", hojas["fija"][0], hojas["fija"][1], False)
@@ -848,7 +904,6 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
         b64 = base64.b64encode(pdf_bytes).decode()
         
-        # --- VISOR INTEGRADO USANDO EMBED ---
         with st.expander("👁️ Previsualizar Guía de Cortes (Taller)", expanded=True):
             pdf_display = f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="700" type="application/pdf">'
             st.markdown(pdf_display, unsafe_allow_html=True)
