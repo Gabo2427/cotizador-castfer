@@ -1,3 +1,5 @@
+import math
+
 # =======================================================
 # LÓGICA EXCLUSIVA PARA VENTANAS
 # =======================================================
@@ -26,7 +28,6 @@ class Ventana:
             self.filas_hoja = 1
 
         # --- MEDIDAS GENERALES ---
-        self.holgura_vidrio = 0.005 # 0.5 cm por lado
         self.intermedio_frente = 0.036 # 3.6 cm viéndolo de frente
         self.intermedio_fondo = 0.026  # 2.6 cm
         
@@ -78,7 +79,6 @@ class Ventana:
         return round(corte_alto, 3), round(corte_ancho, 3)
 
     def calcular_hojas(self):
-        # Función empaquetada para app.py
         alto_fija, ancho_fija = self.calcular_hoja_fija()
         alto_corr, ancho_corr = self.calcular_hoja_corrediza()
         
@@ -95,11 +95,17 @@ class Ventana:
             }
 
     def calcular_vidrio(self, corte_alto_hoja, corte_ancho_hoja):
-        alto_interior = corte_alto_hoja - self.perfil_cabezal - self.perfil_zoclo
-        ancho_interior = corte_ancho_hoja - (self.perfil_cerco_traslape * 2)
+        # Medidas físicas reales del taller en METROS (6cm zóclo, 3.6cm cabezal, 1.5cm holgura)
+        alto_zoclo = 0.060
+        alto_cabezal = 0.036
+        holgura = 0.015
         
-        alto_vidrio_real = alto_interior + (self.holgura_vidrio * 2)
-        ancho_vidrio_real = ancho_interior + (self.holgura_vidrio * 2)
+        # Ancho del vidrio = Medida del Zóclo/Cabezal + 1.5 cm
+        ancho_vidrio_real = corte_ancho_hoja + holgura
+        
+        # Alto del vidrio = Medida del Cerco - Zóclo (6cm) - Cabezal (3.6cm) + 1.5 cm
+        alto_vidrio_real = corte_alto_hoja - (alto_zoclo + alto_cabezal) + holgura
+        
         area_por_vidrio = alto_vidrio_real * ancho_vidrio_real
         
         return round(ancho_vidrio_real, 3), round(alto_vidrio_real, 3), round(area_por_vidrio, 3)
@@ -108,11 +114,12 @@ class Ventana:
         if not self.cuadricula:
             return {"verticales": [], "horizontales": []}
             
-        alto_interior = alto_hoja - self.perfil_cabezal - self.perfil_zoclo
-        largo_vertical = alto_interior + (self.holgura_vidrio * 2)
+        # Medidas físicas reales del taller para descontar espacio interno
+        alto_zoclo = 0.060
+        alto_cabezal = 0.036
         
-        ancho_interior = ancho_hoja - (self.perfil_cerco_traslape * 2)
-        largo_horizontal = ancho_interior + (self.holgura_vidrio * 2)
+        largo_vertical = (alto_hoja - alto_zoclo - alto_cabezal) + (0.005 * 2)
+        largo_horizontal = ancho_hoja + (0.005 * 2)
         
         if not es_gigante:
             num_vert = self.cols_hoja - 1
@@ -192,7 +199,6 @@ class Puerta:
         ancho_corte_relleno = horizontal_hoja + 1.5
         alto_corte_relleno = alto_mitad_libre + 1.5
         
-        import math
         cantidad_duelas = math.ceil(alto_corte_relleno / 12.5)
         
         return ancho_corte_relleno / 100.0, alto_corte_relleno / 100.0, cantidad_duelas
