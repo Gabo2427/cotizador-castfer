@@ -805,10 +805,9 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                         
                         for _ in range(filas * cols):
                             todos_los_vidrios_taller.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": f"{lbl}"})
-                else:
-                    a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
-                    todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl})
-
+                    else:
+                        a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
+                        todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl})
                 if diseno == "2 hojas":
                     procesar_cortes_hoja("Fija", hojas["fija"][0], hojas["fija"][1], False)
                     procesar_cortes_hoja("Corr", hojas["corrediza"][0], hojas["corrediza"][1], False)
