@@ -29,19 +29,20 @@ class Ventana:
         self.intermedio_frente = 0.036 
         self.intermedio_fondo = 0.026  
         
+        # Medidas físicas reales de los perfiles para descuentos dinámicos
         if self.linea_aluminio == "3 pulgadas":
             self.desc_ancho_hoja = 0.190
             self.perfil_cerco_traslape = 0.065 
-            self.perfil_zoclo = 0.085          
-            self.perfil_cabezal = 0.045        
+            self.perfil_zoclo = 0.060          # CORRECCIÓN: Zóclo ventana estándar (6.0 cm)
+            self.perfil_cabezal = 0.036        # CORRECCIÓN: Cabezal estándar (3.6 cm)
             self.descuento_marco_alto = 0.032  
             self.desc_4_hojas = 0.280 
             self.desc_3_hojas = 0.231
-        else: 
+        else: # 2 Pulgadas
             self.desc_ancho_hoja = 0.151       
             self.perfil_cerco_traslape = 0.043 
-            self.perfil_zoclo = 0.070          
-            self.perfil_cabezal = 0.035        
+            self.perfil_zoclo = 0.070          # Zóclo de 2" (7.0 cm)
+            self.perfil_cabezal = 0.035        # Cabezal de 2" (3.5 cm)
             self.descuento_marco_alto = 0.025  
             self.desc_4_hojas = 0.220 
             self.desc_3_hojas = 0.180 
@@ -108,19 +109,22 @@ class Ventana:
             return self.calcular_3_hojas()
 
     def calcular_vidrio(self, corte_alto_hoja, corte_ancho_hoja):
-        alto_zoclo = 0.060
-        alto_cabezal = 0.036
         holgura = 0.015
+        
+        # Ancho del vidrio = Medida interna + holgura
         ancho_vidrio_real = corte_ancho_hoja + holgura
-        alto_vidrio_real = corte_alto_hoja - (alto_zoclo + alto_cabezal) + holgura
+        
+        # Alto del vidrio = Alto del Cerco - (Zóclo + Cabezal) + holgura
+        # Para 3" descontará 6cm + 3.6cm - 1.5cm = 8.1cm exactos.
+        alto_vidrio_real = corte_alto_hoja - (self.perfil_zoclo + self.perfil_cabezal) + holgura
+        
         area_por_vidrio = alto_vidrio_real * ancho_vidrio_real
         return round(ancho_vidrio_real, 3), round(alto_vidrio_real, 3), round(area_por_vidrio, 3)
 
     def calcular_intermedios_aluminio(self, alto_hoja, ancho_hoja, es_gigante=False):
         if not self.cuadricula: return {"verticales": [], "horizontales": []}
-        alto_zoclo = 0.060
-        alto_cabezal = 0.036
-        largo_vertical = (alto_hoja - alto_zoclo - alto_cabezal) + (0.005 * 2)
+        
+        largo_vertical = (alto_hoja - self.perfil_zoclo - self.perfil_cabezal) + (0.005 * 2)
         largo_horizontal = ancho_hoja + (0.005 * 2)
         
         if not es_gigante:
@@ -143,7 +147,6 @@ class VentanaEuroventS50:
         self.diseno = diseno
 
     def calcular_cortes_marco(self):
-        # Descuentos oficiales Manual S50 
         jamba = self.alto
         riel_cabezal = self.ancho - 0.020
         return round(riel_cabezal, 3), round(jamba, 3)
@@ -166,7 +169,6 @@ class FijoEurovent:
         self.serie = serie
 
     def calcular_cortes(self):
-        # Descuentos oficiales Manual S35 y S50 Fijo
         bolsa_vertical = self.alto
         bolsa_horizontal = self.ancho - 0.090
         return round(bolsa_vertical, 3), round(bolsa_horizontal, 3)
