@@ -1,7 +1,7 @@
 import math
 
 # =======================================================
-# LÓGICA EXCLUSIVA PARA VENTANAS
+# LÓGICA EXCLUSIVA PARA VENTANAS (LÍNEA NACIONAL)
 # =======================================================
 class Ventana:
     def __init__(self, ancho, alto, linea_aluminio, color, division_horizontal=False, diseno="2 hojas", cuadricula=False, tipo_cuadricula="2x3"):
@@ -14,7 +14,6 @@ class Ventana:
         self.cuadricula = cuadricula
         self.tipo_cuadricula = tipo_cuadricula
         
-        # --- TRADUCTOR DE CUADRÍCULA (Ej. "2x3" -> 2 Columnas, 3 Filas) ---
         if self.cuadricula:
             try:
                 c_str, r_str = self.tipo_cuadricula.split('x')
@@ -27,11 +26,9 @@ class Ventana:
             self.cols_hoja = 1
             self.filas_hoja = 1
 
-        # --- MEDIDAS GENERALES ---
         self.intermedio_frente = 0.036 
         self.intermedio_fondo = 0.026  
         
-        # --- REGLAS SEGÚN LA LÍNEA ---
         if self.linea_aluminio == "3 pulgadas":
             self.desc_ancho_hoja = 0.190
             self.perfil_cerco_traslape = 0.065 
@@ -39,7 +36,7 @@ class Ventana:
             self.perfil_cabezal = 0.045        
             self.descuento_marco_alto = 0.032  
             self.desc_4_hojas = 0.280 
-            self.desc_3_hojas = 0.231 # Descuento matemático para zóclos de 3 hojas (taller)
+            self.desc_3_hojas = 0.231
         else: 
             self.desc_ancho_hoja = 0.151       
             self.perfil_cerco_traslape = 0.043 
@@ -71,22 +68,16 @@ class Ventana:
 
     def calcular_hoja_corrediza(self):
         alto_fija, ancho_fija = self.calcular_hoja_fija()
-        
         if self.diseno == "Fijo Gigante Centro":
             corte_ancho = (self.ancho - self.desc_4_hojas) / 4
         else:
             corte_ancho = ancho_fija
-            
         corte_alto = alto_fija - 0.005
         return round(corte_alto, 3), round(corte_ancho, 3)
 
-    # ================= NUEVO DISEÑO 3 HOJAS =================
     def calcular_3_hojas(self):
-        # Cálculos de anchos basados en tu fórmula del taller
         zoclo_corr = (self.ancho - self.desc_3_hojas) / 3
         zoclo_fija_ext = zoclo_corr + 0.013 
-        
-        # Cálculos de altos basados en tu fórmula del taller
         cerco_fija_ext = self.alto - 0.005
         cerco_corr_normal = self.alto - 0.046
         cerco_corr_doble = self.alto - 0.049
@@ -117,55 +108,83 @@ class Ventana:
             return self.calcular_3_hojas()
 
     def calcular_vidrio(self, corte_alto_hoja, corte_ancho_hoja):
-        # Medidas físicas reales del taller en METROS (6cm zóclo, 3.6cm cabezal, 1.5cm holgura)
         alto_zoclo = 0.060
         alto_cabezal = 0.036
         holgura = 0.015
-        
-        # Ancho del vidrio = Medida del Zóclo/Cabezal + 1.5 cm
         ancho_vidrio_real = corte_ancho_hoja + holgura
-        
-        # Alto del vidrio = Medida del Cerco - Zóclo (6cm) - Cabezal (3.6cm) + 1.5 cm
         alto_vidrio_real = corte_alto_hoja - (alto_zoclo + alto_cabezal) + holgura
         area_por_vidrio = alto_vidrio_real * ancho_vidrio_real
-        
         return round(ancho_vidrio_real, 3), round(alto_vidrio_real, 3), round(area_por_vidrio, 3)
 
     def calcular_intermedios_aluminio(self, alto_hoja, ancho_hoja, es_gigante=False):
-        if not self.cuadricula:
-            return {"verticales": [], "horizontales": []}
-            
+        if not self.cuadricula: return {"verticales": [], "horizontales": []}
         alto_zoclo = 0.060
         alto_cabezal = 0.036
-        
         largo_vertical = (alto_hoja - alto_zoclo - alto_cabezal) + (0.005 * 2)
         largo_horizontal = ancho_hoja + (0.005 * 2)
         
         if not es_gigante:
             num_vert = self.cols_hoja - 1
             num_horz = self.filas_hoja - 1
-            return {
-                "verticales": [round(largo_vertical, 3)] * num_vert,
-                "horizontales": [round(largo_horizontal, 3)] * num_horz
-            }
+            return {"verticales": [round(largo_vertical, 3)] * num_vert, "horizontales": [round(largo_horizontal, 3)] * num_horz}
         else:
             num_vert = (self.cols_hoja * 2) - 1
             num_horz = self.filas_hoja - 1
-            return {
-                "verticales": [round(largo_vertical, 3)] * num_vert,
-                "horizontales": [round(largo_horizontal, 3)] * num_horz
-            }
+            return {"verticales": [round(largo_vertical, 3)] * num_vert, "horizontales": [round(largo_horizontal, 3)] * num_horz}
+
 
 # =======================================================
-# ALGORITMO DE OPTIMIZACIÓN DE CORTES (Bin Packing)
+# LÓGICA EXCLUSIVA LÍNEA PREMIUM (EUROVENT)
+# =======================================================
+class VentanaEuroventS50:
+    def __init__(self, ancho, alto, diseno="2 hojas"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+
+    def calcular_cortes_marco(self):
+        # Descuentos oficiales Manual S50 
+        jamba = self.alto
+        riel_cabezal = self.ancho - 0.020
+        return round(riel_cabezal, 3), round(jamba, 3)
+
+    def calcular_hojas(self):
+        cerco_traslape = self.alto - 0.066
+        zoclo = (self.ancho / 2.0) - 0.002
+        return round(cerco_traslape, 3), round(zoclo, 3)
+
+    def calcular_vidrio(self):
+        ancho_vidrio = (self.ancho / 2.0) - 0.084
+        alto_vidrio = self.alto - 0.160
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class FijoEurovent:
+    def __init__(self, ancho, alto, serie="Serie 35"):
+        self.ancho = ancho
+        self.alto = alto
+        self.serie = serie
+
+    def calcular_cortes(self):
+        # Descuentos oficiales Manual S35 y S50 Fijo
+        bolsa_vertical = self.alto
+        bolsa_horizontal = self.ancho - 0.090
+        return round(bolsa_vertical, 3), round(bolsa_horizontal, 3)
+
+    def calcular_vidrio(self):
+        ancho_vidrio = self.ancho - 0.075
+        alto_vidrio = self.alto - 0.075
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+
+# =======================================================
+# ALGORITMO DE OPTIMIZACIÓN Y PUERTAS NACIONALES
 # =======================================================
 def optimizar_tramos(lista_cortes_cm, longitud_tramo_cm=610.0, disco_cm=0.3):
-    if not lista_cortes_cm:
-        return []
-    
+    if not lista_cortes_cm: return []
     cortes_ordenados = sorted(lista_cortes_cm, reverse=True)
     tramos = [] 
-    
     for corte in cortes_ordenados:
         colocado = False
         for tramo in tramos:
@@ -174,15 +193,9 @@ def optimizar_tramos(lista_cortes_cm, longitud_tramo_cm=610.0, disco_cm=0.3):
                 tramo.append(corte)
                 colocado = True
                 break
-        
-        if not colocado:
-            tramos.append([corte])
-            
+        if not colocado: tramos.append([corte])
     return tramos
 
-# =======================================================
-# LÓGICA EXCLUSIVA PARA PUERTAS
-# =======================================================
 class Puerta:
     def __init__(self, ancho, alto, detalle, color):
         self.ancho = ancho 
@@ -191,33 +204,15 @@ class Puerta:
         self.color = color
 
     def calcular_cortes_marco(self):
-        ancho_cm = self.ancho * 100
-        alto_cm = self.alto * 100
-        
-        cabezal_marco = ancho_cm - 0.2
-        laterales_marco = alto_cm - 1.8
-        
-        return cabezal_marco / 100.0, laterales_marco / 100.0
+        return (self.ancho * 100 - 0.2) / 100.0, (self.alto * 100 - 1.8) / 100.0
 
     def calcular_cortes_hoja(self):
-        ancho_cm = self.ancho * 100
-        alto_cm = self.alto * 100
-        
-        cerco_hoja = alto_cm - 3.1 
-        horizontal_hoja = ancho_cm - 13.6
-        
-        return cerco_hoja / 100.0, horizontal_hoja / 100.0
+        return (self.alto * 100 - 3.1) / 100.0, (self.ancho * 100 - 13.6) / 100.0
 
     def calcular_relleno(self):
         cerco_hoja = (self.alto * 100) - 3.1
         horizontal_hoja = (self.ancho * 100) - 13.6
-        
-        espacio_libre_vertical = cerco_hoja - 15.0 - 3.5
-        alto_mitad_libre = espacio_libre_vertical / 2.0
-        
+        alto_corte_relleno = ((cerco_hoja - 15.0 - 3.5) / 2.0) + 1.5
         ancho_corte_relleno = horizontal_hoja + 1.5
-        alto_corte_relleno = alto_mitad_libre + 1.5
-        
         cantidad_duelas = math.ceil(alto_corte_relleno / 12.5)
-        
         return ancho_corte_relleno / 100.0, alto_corte_relleno / 100.0, cantidad_duelas
