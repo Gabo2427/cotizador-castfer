@@ -28,8 +28,8 @@ class Ventana:
             self.filas_hoja = 1
 
         # --- MEDIDAS GENERALES ---
-        self.intermedio_frente = 0.036 # 3.6 cm viéndolo de frente
-        self.intermedio_fondo = 0.026  # 2.6 cm
+        self.intermedio_frente = 0.036 
+        self.intermedio_fondo = 0.026  
         
         # --- REGLAS SEGÚN LA LÍNEA ---
         if self.linea_aluminio == "3 pulgadas":
@@ -39,13 +39,15 @@ class Ventana:
             self.perfil_cabezal = 0.045        
             self.descuento_marco_alto = 0.032  
             self.desc_4_hojas = 0.280 
-        else: # 2 Pulgadas
+            self.desc_3_hojas = 0.231 # Descuento matemático para zóclos de 3 hojas (taller)
+        else: 
             self.desc_ancho_hoja = 0.151       
             self.perfil_cerco_traslape = 0.043 
             self.perfil_zoclo = 0.070          
             self.perfil_cabezal = 0.035        
             self.descuento_marco_alto = 0.025  
             self.desc_4_hojas = 0.220 
+            self.desc_3_hojas = 0.180 
 
     def calcular_cortes_marco(self):
         ancho_horizontal = self.ancho - 0.005 
@@ -78,21 +80,41 @@ class Ventana:
         corte_alto = alto_fija - 0.005
         return round(corte_alto, 3), round(corte_ancho, 3)
 
-    def calcular_hojas(self):
-        alto_fija, ancho_fija = self.calcular_hoja_fija()
-        alto_corr, ancho_corr = self.calcular_hoja_corrediza()
+    # ================= NUEVO DISEÑO 3 HOJAS =================
+    def calcular_3_hojas(self):
+        # Cálculos de anchos basados en tu fórmula del taller
+        zoclo_corr = (self.ancho - self.desc_3_hojas) / 3
+        zoclo_fija_ext = zoclo_corr + 0.013 
         
+        # Cálculos de altos basados en tu fórmula del taller
+        cerco_fija_ext = self.alto - 0.005
+        cerco_corr_normal = self.alto - 0.046
+        cerco_corr_doble = self.alto - 0.049
+
+        return {
+            "fija_ext": (round(cerco_fija_ext, 3), round(zoclo_fija_ext, 3)),
+            "corr_normal": (round(cerco_corr_normal, 3), round(zoclo_corr, 3)),
+            "corr_doble": (round(cerco_corr_doble, 3), round(zoclo_corr, 3))
+        }
+
+    def calcular_hojas(self):
         if self.diseno == "2 hojas":
+            alto_fija, ancho_fija = self.calcular_hoja_fija()
+            alto_corr, ancho_corr = self.calcular_hoja_corrediza()
             return {
                 "fija": (round(alto_fija, 3), round(ancho_fija, 3)),
                 "corrediza": (round(alto_corr, 3), round(ancho_corr, 3))
             }
         elif self.diseno == "Fijo Gigante Centro":
+            alto_fija, ancho_fija = self.calcular_hoja_fija()
+            alto_corr, ancho_corr = self.calcular_hoja_corrediza()
             return {
                 "fija_gigante": (round(alto_fija, 3), round(ancho_fija, 3)),
                 "corrediza_izq": (round(alto_corr, 3), round(ancho_corr, 3)),
                 "corrediza_der": (round(alto_corr, 3), round(ancho_corr, 3))
             }
+        elif self.diseno == "3 hojas (1 Fija Ext, 2 Corr)":
+            return self.calcular_3_hojas()
 
     def calcular_vidrio(self, corte_alto_hoja, corte_ancho_hoja):
         # Medidas físicas reales del taller en METROS (6cm zóclo, 3.6cm cabezal, 1.5cm holgura)
@@ -105,7 +127,6 @@ class Ventana:
         
         # Alto del vidrio = Medida del Cerco - Zóclo (6cm) - Cabezal (3.6cm) + 1.5 cm
         alto_vidrio_real = corte_alto_hoja - (alto_zoclo + alto_cabezal) + holgura
-        
         area_por_vidrio = alto_vidrio_real * ancho_vidrio_real
         
         return round(ancho_vidrio_real, 3), round(alto_vidrio_real, 3), round(area_por_vidrio, 3)
@@ -114,7 +135,6 @@ class Ventana:
         if not self.cuadricula:
             return {"verticales": [], "horizontales": []}
             
-        # Medidas físicas reales del taller para descontar espacio interno
         alto_zoclo = 0.060
         alto_cabezal = 0.036
         
@@ -129,7 +149,6 @@ class Ventana:
                 "horizontales": [round(largo_horizontal, 3)] * num_horz
             }
         else:
-            # La hoja gigante tiene el doble de columnas
             num_vert = (self.cols_hoja * 2) - 1
             num_horz = self.filas_hoja - 1
             return {
