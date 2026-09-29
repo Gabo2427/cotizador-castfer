@@ -208,7 +208,6 @@ with st.sidebar:
         opciones = {p[0]: f"{p[1]} ({p[2]})" for p in proyectos_guardados}
         seleccion = st.selectbox("Selecciona un proyecto para cargar:", options=list(opciones.keys()), format_func=lambda x: opciones[x])
         
-        # Botón cargar público: Cualquiera puede cargar para imprimir PDF
         if st.button("📂 Cargar para Taller", use_container_width=True):
             proyecto_cargado = next((p for p in proyectos_guardados if p[0] == seleccion), None)
             if proyecto_cargado:
@@ -508,23 +507,23 @@ if st.session_state.get('admin', False):
         except Exception as e:
             st.error("⚠️ Error generando PDF.")
 
-
 # ==========================================
 # SECCIÓN 4: PRODUCCIÓN DE TALLER (ACCESIBLE PARA TODOS)
 # ==========================================
 st.write("---")
-st.subheader("🚧 Producción de Taller (Optimización Global + Fases)")
-st.info("El algoritmo matemático SIEMPRE optimizará el total de las piezas. Al seleccionar fases, los PDFs te dirán exactamente qué piezas cortar HOY y cuáles CORTAR Y GUARDAR para las fases futuras.")
+st.subheader("🚧 Producción de Taller (Listas de Compra y Cortes)")
 
 usar_fases = st.checkbox("Activar fabricación parcial (Por Fases)", value=False)
 indices_activos = []
 
 if usar_fases:
+    st.info("💡 Modo Fases activado: El PDF te indicará qué piezas CORTAR HOY y cuáles CORTAR Y GUARDAR para después.")
     st.markdown("**Selecciona las piezas que vas a fabricar HOY en el taller:**")
     for i, pieza in enumerate(st.session_state.proyecto):
         if st.checkbox(f"Fabricar HOY - Pieza {i+1}: {pieza['tipo']} ({round(pieza['ancho']*100,1)}x{round(pieza['alto']*100,1)}cm)", value=True, key=f"fase_taller_{i}"):
             indices_activos.append(i)
 else:
+    st.info("💡 Modo Proyecto Completo: El PDF solo mostrará la lista normal de cortes.")
     indices_activos = [i for i in range(len(st.session_state.proyecto))]
 
 if len(indices_activos) == 0 and len(st.session_state.proyecto) > 0:
@@ -571,7 +570,9 @@ with col_prov1:
                     a_m, alt_l = v.calcular_cortes_marco()
                     hojas = v.calcular_hojas()
                     
-                    agregar_cortes_prov(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1), round(a_m*100, 1)], f"L/C-P{num_pieza}", es_activo)
+                    # Chambranas: Asignar C (Cabezal) al horizontal y L (Laterales) a los verticales
+                    agregar_cortes_prov(cortes_chambrana, [round(a_m*100, 1)], f"C-P{num_pieza}", es_activo)
+                    agregar_cortes_prov(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1)], f"L-P{num_pieza}", es_activo)
                     
                     if "3 hojas" in diseno:
                         agregar_cortes_prov(cortes_riel, [round(a_m*100, 1), round(a_m*100, 1)], f"P{num_pieza}", es_activo)
@@ -749,8 +750,11 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                 a_m, alt_l = v.calcular_cortes_marco()
                 hojas = v.calcular_hojas()
                 
-                agregar_cortes_taller(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1), round(a_m*100, 1)], f"L/C-P{num_pieza}", es_activo)
+                # Chambranas: Asignar C (Cabezal) a la horizontal y L (Laterales) a las verticales
+                agregar_cortes_taller(cortes_chambrana, [round(a_m*100, 1)], f"C-P{num_pieza}", es_activo)
+                agregar_cortes_taller(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1)], f"L-P{num_pieza}", es_activo)
                 
+                # Riel adicional para la 3 hojas
                 if "3 hojas" in diseno:
                     agregar_cortes_taller(cortes_riel, [round(a_m*100, 1), round(a_m*100, 1)], f"P{num_pieza}", es_activo)
                 else:
@@ -836,9 +840,13 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                 usados_pend = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in pendientes])
                 sobra = p_data["tamano"] - (sum([u['medida'] for u in p_data["usados"]]) + len(p_data["usados"])*0.3)
                 
-                texto = f"  * De tu retazo de {p_data['tamano']}cm:\n      -> CORTA HOY: {usados_act}\n"
-                if usados_pend: texto += f"      -> CORTA Y GUARDA (Futuro): {usados_pend}\n"
-                texto += f"      -> Sobrante final: {round(sobra,1)}cm"
+                if usar_fases:
+                    texto = f"  * De tu retazo de {p_data['tamano']}cm:\n      -> CORTA HOY: {usados_act}\n"
+                    if usados_pend: texto += f"      -> CORTA Y GUARDA (Futuro): {usados_pend}\n"
+                    texto += f"      -> Sobrante final: {round(sobra,1)}cm"
+                else:
+                    texto = f"  * De tu retazo de {p_data['tamano']}cm:\n      Corta: {usados_act}\n      Sobrante final: {round(sobra,1)}cm"
+                
                 pdf.multi_cell(0, 6, texto)
                 pdf.ln(1)
             
@@ -851,9 +859,13 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                 usados_pend = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in pendientes])
                 sobra = 600.0 - (sum([u['medida'] for u in tramo]) + len(tramo)*0.3)
                 
-                texto = f"  * Tramo {i+1} (6.00m):\n      -> CORTA HOY: {usados_act}\n"
-                if usados_pend: texto += f"      -> CORTA Y GUARDA (Futuro): {usados_pend}\n"
-                texto += f"      -> Sobrante final: {round(sobra,1)}cm"
+                if usar_fases:
+                    texto = f"  * Tramo {i+1} (6.00m):\n      -> CORTA HOY: {usados_act}\n"
+                    if usados_pend: texto += f"      -> CORTA Y GUARDA (Futuro): {usados_pend}\n"
+                    texto += f"      -> Sobrante final: {round(sobra,1)}cm"
+                else:
+                    texto = f"  * Tramo {i+1} (6.00m):\n      Corta: {usados_act}\n      Sobrante final: {round(sobra,1)}cm"
+                    
                 pdf.multi_cell(0, 6, texto)
                 pdf.ln(1)
 
@@ -880,10 +892,13 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                 pdf.set_font("Arial", '', 10)
                 for r in vidrios_rescatados:
                     p, ped = r["pieza"], r["pedazo"]
-                    if p.get('activo', True):
-                        pdf.cell(0, 6, f"  - Del retazo {ped['original']}: Cortar HOY {p['w']} x {p['h']} cm (Mrc: {p['etiqueta']})", ln=True)
+                    if usar_fases:
+                        if p.get('activo', True):
+                            pdf.cell(0, 6, f"  - Del retazo {ped['original']}: Cortar HOY {p['w']} x {p['h']} cm (Mrc: {p['etiqueta']})", ln=True)
+                        else:
+                            pdf.cell(0, 6, f"  - Del retazo {ped['original']}: Cortar Y GUARDAR {p['w']} x {p['h']} cm (Mrc: {p['etiqueta']})", ln=True)
                     else:
-                        pdf.cell(0, 6, f"  - Del retazo {ped['original']}: Cortar Y GUARDAR {p['w']} x {p['h']} cm (Mrc: {p['etiqueta']})", ln=True)
+                        pdf.cell(0, 6, f"  - Del retazo {ped['original']}: Cortar {p['w']} x {p['h']} cm (Mrc: {p['etiqueta']})", ln=True)
                 pdf.ln(3)
 
             if hojas_vidrio:
@@ -902,7 +917,10 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     pdf.set_font("Arial", '', 10)
                     for j, col in enumerate(h['columnas']):
                         for p in col['piezas']:
-                            texto_estado = " [CORTA HOY]" if p.get('activo', True) else " [CORTA Y GUARDA]"
+                            if usar_fases:
+                                texto_estado = " [CORTA HOY]" if p.get('activo', True) else " [CORTA Y GUARDA]"
+                            else:
+                                texto_estado = ""
                             pdf.cell(0, 6, f"      [ ] {p['w']} x {p['h']} cm   (Mrc: {p['etiqueta']}){texto_estado}", ln=True)
                     pdf.ln(2)
 
