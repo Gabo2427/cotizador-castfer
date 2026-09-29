@@ -245,7 +245,6 @@ st.write("---")
 
 st.subheader("1. Configuración de Estructura")
 
-# ----------------- EL NUEVO SWITCH -----------------
 sistema_seleccionado = st.radio("🛠️ Sistema de Manufactura:", ["Línea Nacional (Estándar)", "Línea Premium (Eurovent)"], horizontal=True)
 
 is_editing = st.session_state.edit_index is not None
@@ -293,7 +292,7 @@ if tipo_pieza == "Ventana Corrediza" or tipo_pieza == "Ventana Corrediza S50":
     if sistema_seleccionado == "Línea Nacional (Estándar)":
         opciones_diseno = ["2 hojas", "Fijo Gigante Centro", "3 hojas (1 Fija Ext, 2 Corr)"]
     else:
-        opciones_diseno = ["2 hojas"] # Agregaremos más de Eurovent después
+        opciones_diseno = ["2 hojas"] 
         
     idx_diseno = opciones_diseno.index(def_diseno) if def_diseno in opciones_diseno else 0
     with col_diseno:
@@ -373,7 +372,6 @@ with st.expander("📝 Piezas en el Proyecto", expanded=False):
                     st.session_state.proyecto.pop(i)
                     if st.session_state.edit_index == i: st.session_state.edit_index = None
                     st.rerun()
-
 
 # ==========================================
 # SECCIÓN 3: FINANZAS Y COTIZACIÓN AL CLIENTE (SÓLO ADMIN)
@@ -480,8 +478,200 @@ else:
 
 col_prov1, col_prov2 = st.columns([1, 1])
 
-# =============== GUÍA DE CORTES PDF ===============
+# =============== LISTA PROVEEDOR ===============
 with col_prov1:
+    if st.button("🛒 Lista Material Proveedor (PDF)", type="secondary", use_container_width=True):
+        try:
+            from fpdf import FPDF
+            import base64
+            
+            totales = {"jaladera": 0, "carretilla": 0, "vinil": 0.0}
+            cortes_chambrana, cortes_riel, cortes_cerco, cortes_traslape, cortes_cabezal, cortes_zoclo, cortes_intermedio = [], [], [], [], [], [], []
+            todos_los_vidrios_prov = []
+            lista_medidas = []
+
+            def agregar_cortes_prov(lista, medidas, etiqueta, es_activo):
+                for m in medidas: lista.append({"medida": m, "etiqueta": etiqueta, "activo": es_activo})
+
+            for i, p in enumerate(st.session_state.proyecto):
+                es_activo = i in indices_activos
+                num_pieza = i + 1
+                sys = p.get('sistema', "Línea Nacional (Estándar)")
+                
+                if es_activo: lista_medidas.append(f"P{num_pieza}: {round(p['ancho']*100,1)}x{round(p['alto']*100,1)}cm")
+
+                if sys == "Línea Premium (Eurovent)":
+                    if p['tipo'] == "Ventana Corrediza S50":
+                        if es_activo:
+                            totales["jaladera"] += 1 
+                            totales["carretilla"] += 2
+                            totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100 
+                        
+                        v = VentanaEuroventS50(p['ancho'], p['alto'])
+                        riel, jamba = v.calcular_cortes_marco()
+                        cerco, zoclo = v.calcular_hojas()
+                        
+                        agregar_cortes_prov(cortes_chambrana, [round(jamba*100, 1), round(jamba*100, 1)], f"L(Jam)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_riel, [round(riel*100, 1), round(riel*100, 1)], f"C(Riel)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_cerco, [round(cerco*100, 1), round(cerco*100, 1)], f"Cerco-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_traslape, [round(cerco*100, 1), round(cerco*100, 1)], f"Trasl-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_zoclo, [round(zoclo*100, 1)]*4, f"Zoclo-P{num_pieza}", es_activo)
+                        
+                        a_v, alt_v, _ = v.calcular_vidrio()
+                        todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+                    
+                    elif "Fijo" in p['tipo']:
+                        if es_activo: totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100
+                        v = FijoEurovent(p['ancho'], p['alto'])
+                        bolsa_v, bolsa_h = v.calcular_cortes()
+                        
+                        agregar_cortes_prov(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"L(Bols)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_riel, [round(bolsa_h*100, 1)], f"C(Bols)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_zoclo, [round(bolsa_h*100, 1)], f"C(Escal)-P{num_pieza}", es_activo)
+                        
+                        a_v, alt_v, _ = v.calcular_vidrio()
+                        todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+
+                elif p['tipo'] == "Ventana Corrediza":
+                    diseno = p.get('diseno', "2 hojas")
+                    cuadricula = p.get('cuadricula', False)
+                    t_cuad = p.get('tipo_cuadricula', "2x3")
+                    if es_activo:
+                        if diseno == "Fijo Gigante Centro" or "3 hojas" in diseno:
+                            totales["jaladera"] += 2; totales["carretilla"] += 4
+                        else:
+                            totales["jaladera"] += 1; totales["carretilla"] += 2
+                    
+                    v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=diseno, cuadricula=cuadricula, tipo_cuadricula=t_cuad)
+                    a_m, alt_l = v.calcular_cortes_marco()
+                    hojas = v.calcular_hojas()
+                    
+                    agregar_cortes_prov(cortes_chambrana, [round(a_m*100, 1)], f"C-P{num_pieza}", es_activo)
+                    agregar_cortes_prov(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1)], f"L-P{num_pieza}", es_activo)
+                    
+                    if "3 hojas" in diseno: agregar_cortes_prov(cortes_riel, [round(a_m*100, 1), round(a_m*100, 1)], f"P{num_pieza}", es_activo)
+                    else: agregar_cortes_prov(cortes_riel, [round(a_m*100, 1)], f"P{num_pieza}", es_activo)
+                    
+                    def prov_hoja(alto_h, ancho_h, es_gigante):
+                        agregar_cortes_prov(cortes_cabezal, [round(ancho_h*100, 1)], f"P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_zoclo, [round(ancho_h*100, 1)], f"P{num_pieza}", es_activo)
+                        if es_gigante: agregar_cortes_prov(cortes_cerco, [round(alto_h*100, 1)] * 2, f"P{num_pieza}", es_activo)
+                        else:
+                            agregar_cortes_prov(cortes_cerco, [round(alto_h*100, 1)], f"P{num_pieza}", es_activo)
+                            agregar_cortes_prov(cortes_traslape, [round(alto_h*100, 1)], f"P{num_pieza}", es_activo)
+                            
+                        luz_ancho = (ancho_h * 100) - 10.0
+                        luz_alto = (alto_h * 100) - 9.0
+                        
+                        if cuadricula:
+                            ints = v.calcular_intermedios_aluminio(alto_h, ancho_h, es_gigante)
+                            if ints["verticales"]: agregar_cortes_prov(cortes_intermedio, [round(x*100, 1) for x in ints["verticales"]], f"Vert-P{num_pieza}", es_activo)
+                            if ints["horizontales"]: agregar_cortes_prov(cortes_intermedio, [round(x*100, 1) for x in ints["horizontales"]], f"Horz-P{num_pieza}", es_activo)
+                            
+                            alto_int = alto_h - v.perfil_cabezal - v.perfil_zoclo
+                            ancho_int = ancho_h - (v.perfil_cerco_traslape * 2)
+                            filas = v.filas_hoja
+                            cols = v.cols_hoja * 2 if es_gigante else v.cols_hoja
+                            alto_v = ((alto_int - (filas - 1) * v.intermedio_frente) / filas) + (v.holgura_vidrio * 2)
+                            ancho_v = ((ancho_int - (cols - 1) * v.intermedio_frente) / cols) + (v.holgura_vidrio * 2)
+                            
+                            if es_activo: totales["vinil"] += ((ancho_v*100) + (alto_v*100)) * 2 * (filas * cols)
+                            for _ in range(filas * cols): todos_los_vidrios_prov.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+                        else:
+                            if es_activo: totales["vinil"] += (luz_ancho + luz_alto) * 2
+                            a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
+                            todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+                            
+                    if diseno == "2 hojas":
+                        prov_hoja(hojas["fija"][0], hojas["fija"][1], False)
+                        prov_hoja(hojas["corrediza"][0], hojas["corrediza"][1], False)
+                    elif diseno == "Fijo Gigante Centro":
+                        prov_hoja(hojas["fija_gigante"][0], hojas["fija_gigante"][1], True)
+                        prov_hoja(hojas["corrediza_izq"][0], hojas["corrediza_izq"][1], False)
+                        prov_hoja(hojas["corrediza_der"][0], hojas["corrediza_der"][1], False)
+                    elif "3 hojas" in diseno:
+                        prov_hoja(hojas["fija_ext"][0], hojas["fija_ext"][1], False)
+                        prov_hoja(hojas["corr_normal"][0], hojas["corr_normal"][1], False)
+                        prov_hoja(hojas["corr_doble"][0], hojas["corr_doble"][1], False)
+                        
+                elif p['tipo'] == "Puerta":
+                    puerta = Puerta(p['ancho'], p['alto'], p['detalle'], "Blanco")
+                    ancho_r, alto_r, cant_duelas = puerta.calcular_relleno()
+                    todos_los_vidrios_prov.append({"medida": f"{round(ancho_r*100, 1)} x {round(alto_r*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+
+            def calcular_tramos_a_comprar(cortes):
+                if not cortes: return 0
+                tramos, _ = optimizador_aluminio_taller(cortes, "")
+                return sum(1 for t in tramos if any(c['activo'] for c in t))
+
+            pdf = FPDF()
+            pdf.add_page()
+            try: pdf.image("logopagina.png", x=10, y=8, w=54)
+            except: pass 
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(0, 8, "ORDEN DE COMPRA PARA PROVEEDOR", ln=True, align='R')
+            pdf.set_font("Arial", '', 11)
+            pdf.cell(0, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='R')
+            pdf.cell(0, 6, f"Cliente: {st.session_state.nombre_cliente}", ln=True, align='R')
+            pdf.ln(8)
+            pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+            pdf.ln(5)
+
+            pdf.set_font("Arial", 'B', 12)
+            pdf.set_fill_color(235, 235, 235)
+            pdf.cell(0, 8, " 1. PERFILES A COMPRAR HOY (Tiras de 6 metros)", ln=True, fill=True)
+            pdf.ln(4)
+            pdf.set_font("Arial", '', 11)
+            
+            pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_chambrana)} Jambas / Bolsas / Chambranas de 6 mts", ln=True)
+            pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_riel)} Riel-Cabezal / Rieles de 6 mts", ln=True)
+            pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_cerco)} Cercos de 6 mts", ln=True)
+            pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_traslape)} Traslapes de 6 mts", ln=True)
+            pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_cabezal)} Cabezales de hoja de 6 mts", ln=True)
+            pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_zoclo)} Zoclos / Escalonados de 6 mts", ln=True)
+            pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_intermedio)} Intermedios de 6 mts", ln=True)
+            pdf.ln(4)
+
+            pdf.set_font("Arial", 'B', 12)
+            pdf.cell(0, 8, " 2. HERRAJES Y ACCESORIOS (Para fase actual)", ln=True, fill=True)
+            pdf.ln(4)
+            pdf.set_font("Arial", '', 11)
+            if totales["jaladera"] > 0:
+                pdf.cell(0, 8, f"[   ]   {totales['jaladera']} Cierres Embutidos / Jaladeras", ln=True)
+                pdf.cell(0, 8, f"[   ]   {totales['carretilla']} Carretillas", ln=True)
+                botes = max(1, math.ceil(totales['vinil'] / 1000.0)) 
+                pdf.cell(0, 8, f"[   ]   {botes} Botes de Sellador", ln=True)
+                pdf.cell(0, 8, f"[   ]   {math.ceil(totales['vinil'] / 100.0)} Metros lineales de Vinil / Empaque", ln=True)
+            
+            pdf.ln(6)
+            pdf.set_font("Arial", 'B', 12)
+            pdf.cell(0, 8, " 3. CRISTAL A COMPRAR HOY (Hojas 260cm)", ln=True, fill=True)
+            pdf.ln(4)
+            pdf.set_font("Arial", '', 11)
+            if todos_los_vidrios_prov:
+                hojas_vidrio_comprar, _, config = optimizador_vidrio(todos_los_vidrios_prov, "")
+                hojas_activas = sum(1 for h in hojas_vidrio_comprar if any(p['activo'] for col in h['columnas'] for p in col['piezas']))
+                txt_red = " (Reduccion 0.5cm)" if config['reducido'] else " (Medida exacta)"
+                pdf.cell(0, 8, f"[   ]   {hojas_activas} Hoja(s) de {int(config['ancho'])}x260 cm{txt_red}", ln=True)
+            else:
+                pdf.cell(0, 8, "No se requiere cristal en esta fase.", ln=True)
+
+            pdf.ln(6)
+            pdf.set_font("Arial", 'B', 12)
+            pdf.cell(0, 8, " 4. RESUMEN DE PIEZAS ACTIVAS", ln=True, fill=True)
+            pdf.ln(4)
+            pdf.set_font("Arial", '', 10)
+            if lista_medidas: pdf.multi_cell(0, 6, "   |   ".join(lista_medidas))
+
+            pdf_bytes = pdf.output(dest='S').encode('latin-1')
+            b64 = base64.b64encode(pdf_bytes).decode()
+            with st.expander("👁️ Previsualizar Lista", expanded=True):
+                st.markdown(f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf">', unsafe_allow_html=True)
+            st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="Compras_CASTFER.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #6c757d; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>', unsafe_allow_html=True)
+        except Exception as e: st.error(f"⚠️ Error generando PDF: {e}")
+
+# =============== GUÍA DE CORTES PDF ===============
+with col_prov2:
     st.write("")
     with st.expander("♻️ ¿Pedacería? (Opcional)"):
         ped_chambrana = st.text_input("Recortes Jambas/Bolsas/Chambranas:", "")
