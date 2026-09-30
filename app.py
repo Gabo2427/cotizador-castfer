@@ -263,7 +263,7 @@ else:
     def_tipo = "Ventana Corrediza" if sistema_seleccionado == "Línea Nacional (Estándar)" else "Ventana Corrediza S50"
     def_detalle = "3 pulgadas" if sistema_seleccionado == "Línea Nacional (Estándar)" else "Eurovent S50"
     def_ancho, def_alto = 100.0, 210.0
-    def_diseno, def_cuadricula, def_mosquitero = "2 hojas", False, False
+    def_diseno, def_cuadricula, def_mosquitero = "2 hojas (Fija/Corrediza | O-X)", False, False
 
 col_tipo, col_detalle = st.columns(2)
 
@@ -297,7 +297,7 @@ if tipo_pieza in ["Ventana Corrediza", "Ventana Corrediza S50", "Ventana Corredi
     if sistema_seleccionado == "Línea Nacional (Estándar)":
         opciones_diseno = ["2 hojas", "Fijo Gigante Centro", "3 hojas (1 Fija Ext, 2 Corr)"]
     else:
-        # SEPARACIÓN EXACTA DE MODELOS EUROVENT
+        # SEPARACIÓN EXACTA DE MODELOS EUROVENT PARA DISTINGUIR HERRAJES
         opciones_diseno = [
             "2 hojas (Fija/Corrediza | O-X)", 
             "2 hojas (Doble Corrediza | X-X)", 
@@ -308,7 +308,7 @@ if tipo_pieza in ["Ventana Corrediza", "Ventana Corrediza S50", "Ventana Corredi
     idx_diseno = opciones_diseno.index(def_diseno) if def_diseno in opciones_diseno else 0
     with col_diseno:
         diseno_pieza = st.selectbox("Estilo de Apertura:", opciones_diseno, index=idx_diseno)
-
+    
     with col_cuadricula:
         if sistema_seleccionado == "Línea Nacional (Estándar)":
             st.write("")
@@ -527,14 +527,23 @@ with col_prov1:
 
                 if sys == "Línea Premium (Eurovent)":
                     if p['tipo'] in ["Ventana Corrediza S50", "Ventana Corrediza S70"]:
-                        d_str = p.get('diseno', "2 hojas")
-                        if "3 hojas" in d_str: num_hojas = 3
-                        elif "4 hojas" in d_str: num_hojas = 4
-                        else: num_hojas = 2
+                        d_str = p.get('diseno', "2 hojas (Fija/Corrediza | O-X)")
                         
+                        # --- CONTEO INTELIGENTE DE HERRAJES EUROVENT ---
+                        if "4 hojas" in d_str: 
+                            num_hojas = 4
+                            if es_activo: totales["jaladera"] += 2; totales["carretilla"] += 4
+                        elif "3 hojas" in d_str: 
+                            num_hojas = 3
+                            if es_activo: totales["jaladera"] += 2; totales["carretilla"] += 4
+                        elif "X-X" in d_str: # Doble Corrediza
+                            num_hojas = 2
+                            if es_activo: totales["jaladera"] += 2; totales["carretilla"] += 4
+                        else: # O-X (Fija y Corrediza normal)
+                            num_hojas = 2
+                            if es_activo: totales["jaladera"] += 1; totales["carretilla"] += 2
+                            
                         if es_activo:
-                            totales["jaladera"] += (2 if num_hojas >= 3 else 1)
-                            totales["carretilla"] += (num_hojas * 2)
                             totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100 
                         
                         if p['tipo'] == "Ventana Corrediza S50":
@@ -764,7 +773,7 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
             # ------- LÓGICA EUROVENT PREMIUM -------
             if sys == "Línea Premium (Eurovent)":
                 if p['tipo'] in ["Ventana Corrediza S50", "Ventana Corrediza S70"]:
-                    d_str = p.get('diseno', "2 hojas")
+                    d_str = p.get('diseno', "2 hojas (Fija/Corrediza | O-X)")
                     if "3 hojas" in d_str: num_hojas = 3
                     elif "4 hojas" in d_str: num_hojas = 4
                     else: num_hojas = 2
