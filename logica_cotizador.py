@@ -304,3 +304,220 @@ class Puerta:
         ancho_corte_relleno = horizontal_hoja + 1.5
         cantidad_duelas = math.ceil(alto_corte_relleno / 12.5)
         return ancho_corte_relleno / 100.0, alto_corte_relleno / 100.0, cantidad_duelas
+
+class VentanaEuroventS60:
+    def __init__(self, ancho, alto, diseno="2 hojas (X-X / O-X)"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+
+    def calcular_cortes_marco(self):
+        # Descuentos oficiales Manual Eurovent S60
+        jamba = self.alto
+        riel_cabezal = self.ancho  # El riel se corta a medida exacta (L)
+        return round(riel_cabezal, 3), round(jamba, 3)
+
+    def calcular_hojas(self):
+        cerco_traslape = self.alto - 0.057 # H - 57 mm
+        
+        if "3 hojas" in self.diseno:
+            zoclo = (self.ancho / 3.0) + 0.012
+        elif "4 hojas" in self.diseno:
+            zoclo = (self.ancho / 4.0) + 0.015
+        else: # 2 hojas
+            zoclo = (self.ancho / 2.0) # L/2
+            
+        return round(cerco_traslape, 3), round(zoclo, 3)
+
+    def calcular_vidrio(self):
+        alto_vidrio = self.alto - 0.138 # H - 138 mm
+        
+        if "3 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 3.0) - 0.065
+        elif "4 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 4.0) - 0.072
+        else: # 2 hojas
+            ancho_vidrio = (self.ancho / 2.0) - 0.082 # L/2 - 82 mm
+            
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class FijoEuroventS60:
+    def __init__(self, ancho, alto):
+        self.ancho = ancho
+        self.alto = alto
+
+    def calcular_cortes(self):
+        # Contramarco Vertical = H. Contramarco Horizontal = L - 45mm
+        vertical = self.alto
+        horizontal = self.ancho - 0.045 
+        return round(vertical, 3), round(horizontal, 3)
+
+    def calcular_vidrio(self):
+        # Vidrio: L - 57 mm, H - 57 mm
+        ancho_vidrio = self.ancho - 0.057
+        alto_vidrio = self.alto - 0.057
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class FijoEuroventS140:
+    def __init__(self, ancho, alto):
+        self.ancho = ancho
+        self.alto = alto
+
+    def calcular_cortes(self):
+        # Bolsa Vertical = H. Escalonado Horizontal = L - 102mm
+        vertical = self.alto
+        horizontal = self.ancho - 0.102 
+        return round(vertical, 3), round(horizontal, 3)
+
+    def calcular_vidrio(self):
+        # Vidrio: L - 85 mm, H - 85 mm
+        ancho_vidrio = self.ancho - 0.085
+        alto_vidrio = self.alto - 0.085
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+# =======================================================
+# LÓGICA EXCLUSIVA PUERTAS PREMIUM (EUROVENT)
+# =======================================================
+
+class PuertaComercialEuroventS50:
+    def __init__(self, ancho, alto, diseno="1 hoja"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+
+    def calcular_cortes_marco(self):
+        # Marco: Cabezal = L - 0.2cm, Laterales = H - 1.8cm[cite: 10]
+        cabezal = self.ancho - 0.002
+        laterales = self.alto - 0.018
+        return round(cabezal, 3), round(laterales, 3)
+
+    def calcular_hojas(self):
+        # Cerco = H - 44mm, Zóclo/Cabezal de hoja = L - 51mm (para 1 hoja) o L/2 - 38mm (para 2 hojas)[cite: 10]
+        cerco = self.alto - 0.044
+        if "2 hojas" in self.diseno:
+            horizontal_hoja = (self.ancho / 2.0) - 0.038
+        else: # 1 hoja
+            horizontal_hoja = self.ancho - 0.051
+        return round(cerco, 3), round(horizontal_hoja, 3)
+
+    def calcular_vidrio(self):
+        # Vidrio 1 hoja: L - 17.1 cm, H - 17.1 cm[cite: 10]
+        # Vidrio 2 hojas: L/2 - 12.0 cm, H - 18.0 cm (Ajustado por traslape)[cite: 10]
+        if "2 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 2.0) - 0.120
+            alto_vidrio = self.alto - 0.180
+        else:
+            ancho_vidrio = self.ancho - 0.171
+            alto_vidrio = self.alto - 0.171
+            
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class PuertaResidencialEuroventS50:
+    def __init__(self, ancho, alto, diseno="1 hoja"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+
+    def calcular_cortes_marco(self):
+        # Marco idéntico a la Comercial: Cabezal = L - 0.2cm, Laterales = H - 1.8cm
+        cabezal = self.ancho - 0.002
+        laterales = self.alto - 0.018
+        return round(cabezal, 3), round(laterales, 3)
+
+    def calcular_hojas(self):
+        # Cerco = H - 44mm, Zóclo/Cabezal de hoja = L - 268mm (1 hoja) o L/2 - 165mm (2 hojas) por ser perfiles anchos[cite: 10]
+        cerco = self.alto - 0.044
+        if "2 hojas" in self.diseno:
+            horizontal_hoja = (self.ancho / 2.0) - 0.165
+        else: # 1 hoja
+            horizontal_hoja = self.ancho - 0.268
+        return round(cerco, 3), round(horizontal_hoja, 3)
+
+    def calcular_vidrio(self):
+        # Vidrio 1 hoja: L - 34.9 cm, H - 34.9 cm (Perfiles muy anchos)[cite: 10]
+        # Vidrio 2 hojas: L/2 - 15.4 cm, H/4 - 11.2 cm (Aproximación de catálogo)[cite: 10]
+        if "2 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 2.0) - 0.154
+            alto_vidrio = self.alto - 0.224 # Ajuste a luz completa
+        else:
+            ancho_vidrio = self.ancho - 0.349
+            alto_vidrio = self.alto - 0.349
+            
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+        
+# =======================================================
+# LÓGICA EXCLUSIVA PUERTAS PREMIUM (EUROVENT)
+# =======================================================
+
+class PuertaComercialEuroventS50:
+    def __init__(self, ancho, alto, diseno="1 hoja"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+
+    def calcular_cortes_marco(self):
+        # Marco: Cabezal = L - 0.2cm, Laterales = H - 1.8cm[cite: 10]
+        cabezal = self.ancho - 0.002
+        laterales = self.alto - 0.018
+        return round(cabezal, 3), round(laterales, 3)
+
+    def calcular_hojas(self):
+        # Cerco = H - 44mm, Zóclo/Cabezal de hoja = L - 51mm (para 1 hoja) o L/2 - 38mm (para 2 hojas)[cite: 10]
+        cerco = self.alto - 0.044
+        if "2 hojas" in self.diseno:
+            horizontal_hoja = (self.ancho / 2.0) - 0.038
+        else: # 1 hoja
+            horizontal_hoja = self.ancho - 0.051
+        return round(cerco, 3), round(horizontal_hoja, 3)
+
+    def calcular_vidrio(self):
+        # Vidrio 1 hoja: L - 17.1 cm, H - 17.1 cm[cite: 10]
+        # Vidrio 2 hojas: L/2 - 12.0 cm, H - 18.0 cm (Ajustado por traslape)[cite: 10]
+        if "2 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 2.0) - 0.120
+            alto_vidrio = self.alto - 0.180
+        else:
+            ancho_vidrio = self.ancho - 0.171
+            alto_vidrio = self.alto - 0.171
+            
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class PuertaResidencialEuroventS50:
+    def __init__(self, ancho, alto, diseno="1 hoja"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+
+    def calcular_cortes_marco(self):
+        # Marco idéntico a la Comercial: Cabezal = L - 0.2cm, Laterales = H - 1.8cm
+        cabezal = self.ancho - 0.002
+        laterales = self.alto - 0.018
+        return round(cabezal, 3), round(laterales, 3)
+
+    def calcular_hojas(self):
+        # Cerco = H - 44mm, Zóclo/Cabezal de hoja = L - 268mm (1 hoja) o L/2 - 165mm (2 hojas) por ser perfiles anchos[cite: 10]
+        cerco = self.alto - 0.044
+        if "2 hojas" in self.diseno:
+            horizontal_hoja = (self.ancho / 2.0) - 0.165
+        else: # 1 hoja
+            horizontal_hoja = self.ancho - 0.268
+        return round(cerco, 3), round(horizontal_hoja, 3)
+
+    def calcular_vidrio(self):
+        # Vidrio 1 hoja: L - 34.9 cm, H - 34.9 cm (Perfiles muy anchos)[cite: 10]
+        # Vidrio 2 hojas: L/2 - 15.4 cm, H/4 - 11.2 cm (Aproximación de catálogo)[cite: 10]
+        if "2 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 2.0) - 0.154
+            alto_vidrio = self.alto - 0.224 # Ajuste a luz completa
+        else:
+            ancho_vidrio = self.ancho - 0.349
+            alto_vidrio = self.alto - 0.349
+            
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
