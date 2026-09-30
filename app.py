@@ -271,6 +271,11 @@ if sistema_seleccionado == "Línea Nacional (Estándar)":
     tipos_disponibles = ["Ventana Corrediza", "Puerta", "Cancel de Baño"]
 else:
     tipos_disponibles = ["Ventana Corrediza S50", "Ventana Corrediza S70", "Ventana Batiente S35", "Fijo S35", "Fijo S50", "Fijo S70"]
+if sistema_seleccionado == "Línea Nacional (Estándar)":
+    tipos_disponibles = ["Ventana Corrediza", "Puerta", "Cancel de Baño"]
+else:
+    # AQUI AGREGAMOS LA S60 y EL FIJO S140 AL MENÚ
+    tipos_disponibles = ["Ventana Corrediza S50", "Ventana Corrediza S60", "Ventana Corrediza S70", "Ventana Batiente S35", "Fijo S35", "Fijo S50", "Fijo S60", "Fijo S70", "Fijo S140"]
 
 idx_tipo = tipos_disponibles.index(def_tipo) if def_tipo in tipos_disponibles else 0
 
@@ -280,8 +285,11 @@ with col_tipo:
 if sistema_seleccionado == "Línea Nacional (Estándar)":
     opciones_detalle = ["3 pulgadas", "2 pulgadas"] if tipo_pieza == "Ventana Corrediza" else ["Vivienda", "Baño"] if tipo_pieza == "Puerta" else ["Corredizo", "Abatible"]
 else:
+    # AQUI ENLAZAMOS LOS DETALLES CORRECTOS
     if "S50" in tipo_pieza: opciones_detalle = ["Eurovent S50"]
+    elif "S60" in tipo_pieza: opciones_detalle = ["Eurovent S60"]
     elif "S70" in tipo_pieza: opciones_detalle = ["Eurovent S70"]
+    elif "S140" in tipo_pieza: opciones_detalle = ["Eurovent S140"]
     else: opciones_detalle = ["Eurovent S35"]
 
 idx_det = opciones_detalle.index(def_detalle) if def_detalle in opciones_detalle else 0
