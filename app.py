@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 from collections import Counter
-from logica_cotizador import Ventana, Puerta, VentanaEuroventS50, VentanaEuroventS70, FijoEurovent, VentanaProyeccionBatienteEuroventS35
+from logica_cotizador import Ventana, Puerta, VentanaEuroventS50, VentanaEuroventS60, VentanaEuroventS70, FijoEurovent, FijoEuroventS60, FijoEuroventS140, VentanaProyeccionBatienteEuroventS35, PuertaComercialEuroventS50, PuertaResidencialEuroventS50
 import db_manager
 import math
 from datetime import datetime
@@ -270,12 +270,10 @@ col_tipo, col_detalle = st.columns(2)
 if sistema_seleccionado == "Línea Nacional (Estándar)":
     tipos_disponibles = ["Ventana Corrediza", "Puerta", "Cancel de Baño"]
 else:
-    tipos_disponibles = ["Ventana Corrediza S50", "Ventana Corrediza S70", "Ventana Batiente S35", "Fijo S35", "Fijo S50", "Fijo S70"]
-if sistema_seleccionado == "Línea Nacional (Estándar)":
-    tipos_disponibles = ["Ventana Corrediza", "Puerta", "Cancel de Baño"]
-else:
-    # AQUI AGREGAMOS LA S60 y EL FIJO S140 AL MENÚ
-    tipos_disponibles = ["Ventana Corrediza S50", "Ventana Corrediza S60", "Ventana Corrediza S70", "Ventana Batiente S35", "Fijo S35", "Fijo S50", "Fijo S60", "Fijo S70", "Fijo S140"]
+    # MENÚ EUROVENT CLASSIC COMPLETO
+    tipos_disponibles = ["Ventana Corrediza S50", "Ventana Corrediza S60", "Ventana Corrediza S70", 
+                         "Ventana Batiente S35", "Puerta Comercial S50", "Puerta Residencial S50", 
+                         "Fijo S35", "Fijo S50", "Fijo S60", "Fijo S70", "Fijo S140"]
 
 idx_tipo = tipos_disponibles.index(def_tipo) if def_tipo in tipos_disponibles else 0
 
@@ -285,7 +283,6 @@ with col_tipo:
 if sistema_seleccionado == "Línea Nacional (Estándar)":
     opciones_detalle = ["3 pulgadas", "2 pulgadas"] if tipo_pieza == "Ventana Corrediza" else ["Vivienda", "Baño"] if tipo_pieza == "Puerta" else ["Corredizo", "Abatible"]
 else:
-    # AQUI ENLAZAMOS LOS DETALLES CORRECTOS
     if "S50" in tipo_pieza: opciones_detalle = ["Eurovent S50"]
     elif "S60" in tipo_pieza: opciones_detalle = ["Eurovent S60"]
     elif "S70" in tipo_pieza: opciones_detalle = ["Eurovent S70"]
@@ -299,19 +296,13 @@ with col_detalle:
 
 mosquitero_pieza = False
 
-if tipo_pieza in ["Ventana Corrediza", "Ventana Corrediza S50", "Ventana Corrediza S70"]:
+if tipo_pieza in ["Ventana Corrediza", "Ventana Corrediza S50", "Ventana Corrediza S60", "Ventana Corrediza S70"]:
     col_diseno, col_cuadricula = st.columns(2)
     
     if sistema_seleccionado == "Línea Nacional (Estándar)":
         opciones_diseno = ["2 hojas", "Fijo Gigante Centro", "3 hojas (1 Fija Ext, 2 Corr)"]
     else:
-        # SEPARACIÓN EXACTA DE MODELOS EUROVENT PARA DISTINGUIR HERRAJES
-        opciones_diseno = [
-            "2 hojas (Fija/Corrediza | O-X)", 
-            "2 hojas (Doble Corrediza | X-X)", 
-            "3 hojas (X-O-X)", 
-            "4 hojas (O-X-X-O)"
-        ] 
+        opciones_diseno = ["2 hojas (Fija/Corrediza | O-X)", "2 hojas (Doble Corrediza | X-X)", "3 hojas (X-O-X)", "4 hojas (O-X-X-O)"] 
         
     idx_diseno = opciones_diseno.index(def_diseno) if def_diseno in opciones_diseno else 0
     with col_diseno:
@@ -341,6 +332,15 @@ elif tipo_pieza == "Ventana Batiente S35":
     with col_mosq:
         st.write("")
         mosquitero_pieza = st.checkbox("Agregar Mosquitero Fijo", value=def_mosquitero)
+    cuadricula_pieza = False
+    tipo_cuadricula_pieza = "2x3"
+
+elif tipo_pieza in ["Puerta Comercial S50", "Puerta Residencial S50"]:
+    col_diseno, _ = st.columns(2)
+    opciones_diseno = ["1 hoja", "2 hojas"]
+    idx_diseno = opciones_diseno.index(def_diseno) if def_diseno in opciones_diseno else 0
+    with col_diseno:
+        diseno_pieza = st.selectbox("Estilo de Apertura:", opciones_diseno, index=idx_diseno)
     cuadricula_pieza = False
     tipo_cuadricula_pieza = "2x3"
     
@@ -489,7 +489,9 @@ if st.session_state.get('admin', False):
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             b64 = base64.b64encode(pdf_bytes).decode()
             with st.expander("👁️ Previsualizar Recibo", expanded=True):
-                st.markdown(f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf">', unsafe_allow_html=True)
+                # ETIQUETA OBJECT PARA EVITAR BLOQUEO DE NAVEGADORES
+                pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="450px"><p>Tu navegador bloquea la previsualización. Usa el botón de descarga abajo.</p></object>'
+                st.markdown(pdf_display, unsafe_allow_html=True)
             st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="Cotizacion_CASTFER.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #ff4b4b; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">📥 Descargar Recibo</a>', unsafe_allow_html=True)
         except Exception as e: st.error("⚠️ Error generando PDF.")
 
@@ -534,20 +536,19 @@ with col_prov1:
                 if es_activo: lista_medidas.append(f"P{num_pieza}: {round(p['ancho']*100,1)}x{round(p['alto']*100,1)}cm")
 
                 if sys == "Línea Premium (Eurovent)":
-                    if p['tipo'] in ["Ventana Corrediza S50", "Ventana Corrediza S70"]:
+                    if p['tipo'] in ["Ventana Corrediza S50", "Ventana Corrediza S60", "Ventana Corrediza S70"]:
                         d_str = p.get('diseno', "2 hojas (Fija/Corrediza | O-X)")
                         
-                        # --- CONTEO INTELIGENTE DE HERRAJES EUROVENT ---
                         if "4 hojas" in d_str: 
                             num_hojas = 4
                             if es_activo: totales["jaladera"] += 2; totales["carretilla"] += 4
                         elif "3 hojas" in d_str: 
                             num_hojas = 3
                             if es_activo: totales["jaladera"] += 2; totales["carretilla"] += 4
-                        elif "X-X" in d_str: # Doble Corrediza
+                        elif "X-X" in d_str: 
                             num_hojas = 2
                             if es_activo: totales["jaladera"] += 2; totales["carretilla"] += 4
-                        else: # O-X (Fija y Corrediza normal)
+                        else: 
                             num_hojas = 2
                             if es_activo: totales["jaladera"] += 1; totales["carretilla"] += 2
                             
@@ -556,6 +557,8 @@ with col_prov1:
                         
                         if p['tipo'] == "Ventana Corrediza S50":
                             v = VentanaEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                        elif p['tipo'] == "Ventana Corrediza S60":
+                            v = VentanaEuroventS60(p['ancho'], p['alto'], diseno=d_str)
                         else:
                             v = VentanaEuroventS70(p['ancho'], p['alto'], diseno=d_str)
                             
@@ -574,12 +577,16 @@ with col_prov1:
                     
                     elif "Fijo" in p['tipo']:
                         if es_activo: totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100
-                        v = FijoEurovent(p['ancho'], p['alto'])
+                        
+                        if p['tipo'] == "Fijo S60": v = FijoEuroventS60(p['ancho'], p['alto'])
+                        elif p['tipo'] == "Fijo S140": v = FijoEuroventS140(p['ancho'], p['alto'])
+                        else: v = FijoEurovent(p['ancho'], p['alto'])
+                        
                         bolsa_v, bolsa_h = v.calcular_cortes()
                         
-                        agregar_cortes_prov(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"L(Bols)-P{num_pieza}", es_activo)
-                        agregar_cortes_prov(cortes_riel, [round(bolsa_h*100, 1)], f"C(Bols)-P{num_pieza}", es_activo)
-                        agregar_cortes_prov(cortes_zoclo, [round(bolsa_h*100, 1)], f"C(Escal)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"L(Fijo)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_riel, [round(bolsa_h*100, 1)], f"C(Fijo1)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_zoclo, [round(bolsa_h*100, 1)], f"C(Fijo2)-P{num_pieza}", es_activo)
                         
                         a_v, alt_v, _ = v.calcular_vidrio()
                         todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
@@ -603,6 +610,30 @@ with col_prov1:
                             num_mosq = 2 if "2 hojas" in p.get('diseno', '') else 1
                             agregar_cortes_prov(cortes_mosquitero, [round(m_alto*100, 1)]*(2*num_mosq) + [round(m_ancho*100, 1)]*(2*num_mosq), f"Mosq-P{num_pieza}", es_activo)
                             
+                        a_v, alt_v, _ = v.calcular_vidrio()
+                        for _ in range(hojas_totales): todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+
+                    elif p['tipo'] in ["Puerta Comercial S50", "Puerta Residencial S50"]:
+                        d_str = p.get('diseno', "1 hoja")
+                        hojas_totales = 2 if "2 hojas" in d_str else 1
+                        
+                        if es_activo:
+                            totales["jaladera"] += 1 # 1 Cerradura
+                            totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100 * hojas_totales
+                            
+                        if p['tipo'] == "Puerta Comercial S50":
+                            v = PuertaComercialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                        else:
+                            v = PuertaResidencialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                            
+                        cm_w, cm_h = v.calcular_cortes_marco()
+                        c_alto, c_ancho = v.calcular_hojas()
+                        
+                        agregar_cortes_prov(cortes_chambrana, [round(cm_h*100, 1)]*2, f"Marco(Lat)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_riel, [round(cm_w*100, 1)], f"Marco(Sup)-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_cerco, [round(c_alto*100, 1)]*(2*hojas_totales), f"CercoP-P{num_pieza}", es_activo)
+                        agregar_cortes_prov(cortes_zoclo, [round(c_ancho*100, 1)]*(2*hojas_totales), f"ZocloP-P{num_pieza}", es_activo)
+                        
                         a_v, alt_v, _ = v.calcular_vidrio()
                         for _ in range(hojas_totales): todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
 
@@ -703,7 +734,7 @@ with col_prov1:
             pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_traslape)} Traslapes (6m)", ln=True)
             pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_cabezal)} Cabezales de hoja / Marco Hoja H. (6m)", ln=True)
             pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_zoclo)} Zoclos / Escalonados (6m)", ln=True)
-            pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_intermedio)} Intermedios (6m)", ln=True)
+            if cortes_intermedio: pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_intermedio)} Intermedios (6m)", ln=True)
             if cortes_mosquitero: pdf.cell(0, 8, f"[   ]   {calcular_tramos_a_comprar(cortes_mosquitero)} Perfiles para Mosquitero Fijo (6m)", ln=True)
             pdf.ln(4)
 
@@ -712,8 +743,8 @@ with col_prov1:
             pdf.ln(4)
             pdf.set_font("Arial", '', 11)
             if totales["jaladera"] > 0:
-                pdf.cell(0, 8, f"[   ]   {totales['jaladera']} Cierres Embutidos / Jaladeras", ln=True)
-                pdf.cell(0, 8, f"[   ]   {totales['carretilla']} Carretillas", ln=True)
+                pdf.cell(0, 8, f"[   ]   {totales['jaladera']} Cierres Embutidos / Cerraduras", ln=True)
+                if totales['carretilla'] > 0: pdf.cell(0, 8, f"[   ]   {totales['carretilla']} Carretillas", ln=True)
                 botes = max(1, math.ceil(totales['vinil'] / 1000.0)) 
                 pdf.cell(0, 8, f"[   ]   {botes} Botes de Sellador", ln=True)
                 pdf.cell(0, 8, f"[   ]   {math.ceil(totales['vinil'] / 100.0)} Metros lineales de Vinil / Empaque", ln=True)
@@ -741,7 +772,9 @@ with col_prov1:
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             b64 = base64.b64encode(pdf_bytes).decode()
             with st.expander("👁️ Previsualizar Lista", expanded=True):
-                st.markdown(f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="450" type="application/pdf">', unsafe_allow_html=True)
+                # ETIQUETA OBJECT PARA EVITAR BLOQUEO DE NAVEGADORES
+                pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="450px"><p>Tu navegador bloquea la previsualización. Usa el botón de descarga abajo.</p></object>'
+                st.markdown(pdf_display, unsafe_allow_html=True)
             st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="Compras_CASTFER.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #6c757d; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>', unsafe_allow_html=True)
         except Exception as e: st.error(f"⚠️ Error generando PDF: {e}")
 
@@ -780,7 +813,7 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
 
             # ------- LÓGICA EUROVENT PREMIUM -------
             if sys == "Línea Premium (Eurovent)":
-                if p['tipo'] in ["Ventana Corrediza S50", "Ventana Corrediza S70"]:
+                if p['tipo'] in ["Ventana Corrediza S50", "Ventana Corrediza S60", "Ventana Corrediza S70"]:
                     d_str = p.get('diseno', "2 hojas (Fija/Corrediza | O-X)")
                     if "3 hojas" in d_str: num_hojas = 3
                     elif "4 hojas" in d_str: num_hojas = 4
@@ -788,6 +821,8 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     
                     if p['tipo'] == "Ventana Corrediza S50":
                         v = VentanaEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                    elif p['tipo'] == "Ventana Corrediza S60":
+                        v = VentanaEuroventS60(p['ancho'], p['alto'], diseno=d_str)
                     else:
                         v = VentanaEuroventS70(p['ancho'], p['alto'], diseno=d_str)
                         
@@ -805,12 +840,15 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                         todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
                 
                 elif "Fijo" in p['tipo']:
-                    v = FijoEurovent(p['ancho'], p['alto'])
+                    if p['tipo'] == "Fijo S60": v = FijoEuroventS60(p['ancho'], p['alto'])
+                    elif p['tipo'] == "Fijo S140": v = FijoEuroventS140(p['ancho'], p['alto'])
+                    else: v = FijoEurovent(p['ancho'], p['alto'])
+                    
                     bolsa_v, bolsa_h = v.calcular_cortes()
                     
-                    agregar_cortes_taller(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"L(Bols)-P{num_pieza}", es_activo)
-                    agregar_cortes_taller(cortes_riel, [round(bolsa_h*100, 1)], f"C(Bols)-P{num_pieza}", es_activo)
-                    agregar_cortes_taller(cortes_zoclo, [round(bolsa_h*100, 1)], f"C(Escal)-P{num_pieza}", es_activo)
+                    agregar_cortes_taller(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"L(Fijo)-P{num_pieza}", es_activo)
+                    agregar_cortes_taller(cortes_riel, [round(bolsa_h*100, 1)], f"C(Fijo1)-P{num_pieza}", es_activo)
+                    agregar_cortes_taller(cortes_zoclo, [round(bolsa_h*100, 1)], f"C(Fijo2)-P{num_pieza}", es_activo)
                     
                     a_v, alt_v, _ = v.calcular_vidrio()
                     todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
@@ -836,6 +874,26 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     a_v, alt_v, _ = v.calcular_vidrio()
                     for _ in range(hojas_totales):
                         todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+
+                elif p['tipo'] in ["Puerta Comercial S50", "Puerta Residencial S50"]:
+                    d_str = p.get('diseno', "1 hoja")
+                    hojas_totales = 2 if "2 hojas" in d_str else 1
+                        
+                    if p['tipo'] == "Puerta Comercial S50":
+                        v = PuertaComercialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                    else:
+                        v = PuertaResidencialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                            
+                    cm_w, cm_h = v.calcular_cortes_marco()
+                    c_alto, c_ancho = v.calcular_hojas()
+                        
+                    agregar_cortes_taller(cortes_chambrana, [round(cm_h*100, 1)]*2, f"Marco(Lat)-P{num_pieza}", es_activo)
+                    agregar_cortes_taller(cortes_riel, [round(cm_w*100, 1)], f"Marco(Sup)-P{num_pieza}", es_activo)
+                    agregar_cortes_taller(cortes_cerco, [round(c_alto*100, 1)]*(2*hojas_totales), f"CercoP-P{num_pieza}", es_activo)
+                    agregar_cortes_taller(cortes_zoclo, [round(c_ancho*100, 1)]*(2*hojas_totales), f"ZocloP-P{num_pieza}", es_activo)
+                        
+                    a_v, alt_v, _ = v.calcular_vidrio()
+                    for _ in range(hojas_totales): todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
 
             # ------- LÓGICA NACIONAL ESTÁNDAR -------
             elif p['tipo'] == "Ventana Corrediza":
@@ -952,7 +1010,9 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
         b64 = base64.b64encode(pdf_bytes).decode()
         with st.expander("👁️ Previsualizar Guía", expanded=True):
-            st.markdown(f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="700" type="application/pdf">', unsafe_allow_html=True)
+            # ETIQUETA OBJECT PARA EVITAR BLOQUEO DE NAVEGADORES
+            pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="700px"><p>Tu navegador bloquea la previsualización. Usa el botón de descarga abajo.</p></object>'
+            st.markdown(pdf_display, unsafe_allow_html=True)
         st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="Guia_Cortes.pdf" target="_blank" style="text-decoration: none; padding: 12px; background-color: #007bff; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%; font-size: 16px; font-weight: bold;">📥 Descargar Guía</a>', unsafe_allow_html=True)
         st.balloons()
     except Exception as e:
