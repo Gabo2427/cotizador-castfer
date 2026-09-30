@@ -297,12 +297,18 @@ if tipo_pieza in ["Ventana Corrediza", "Ventana Corrediza S50", "Ventana Corredi
     if sistema_seleccionado == "Línea Nacional (Estándar)":
         opciones_diseno = ["2 hojas", "Fijo Gigante Centro", "3 hojas (1 Fija Ext, 2 Corr)"]
     else:
-        opciones_diseno = ["2 hojas (X-X / O-X)", "3 hojas (X-O-X)", "4 hojas (O-X-X-O)"] 
+        # SEPARACIÓN EXACTA DE MODELOS EUROVENT
+        opciones_diseno = [
+            "2 hojas (Fija/Corrediza | O-X)", 
+            "2 hojas (Doble Corrediza | X-X)", 
+            "3 hojas (X-O-X)", 
+            "4 hojas (O-X-X-O)"
+        ] 
         
     idx_diseno = opciones_diseno.index(def_diseno) if def_diseno in opciones_diseno else 0
     with col_diseno:
         diseno_pieza = st.selectbox("Estilo de Apertura:", opciones_diseno, index=idx_diseno)
-    
+
     with col_cuadricula:
         if sistema_seleccionado == "Línea Nacional (Estándar)":
             st.write("")
