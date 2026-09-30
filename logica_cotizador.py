@@ -110,23 +110,15 @@ class Ventana:
 
     def calcular_vidrio(self, corte_alto_hoja, corte_ancho_hoja):
         holgura = 0.015
-        
-        # Ancho del vidrio = Medida interna + holgura
         ancho_vidrio_real = corte_ancho_hoja + holgura
-        
-        # Alto del vidrio = Alto del Cerco - (Zóclo + Cabezal) + holgura
-        # Para 3" descontará 6cm + 3.6cm - 1.5cm = 8.1cm exactos.
         alto_vidrio_real = corte_alto_hoja - (self.perfil_zoclo + self.perfil_cabezal) + holgura
-        
         area_por_vidrio = alto_vidrio_real * ancho_vidrio_real
         return round(ancho_vidrio_real, 3), round(alto_vidrio_real, 3), round(area_por_vidrio, 3)
 
     def calcular_intermedios_aluminio(self, alto_hoja, ancho_hoja, es_gigante=False):
         if not self.cuadricula: return {"verticales": [], "horizontales": []}
-        
         largo_vertical = (alto_hoja - self.perfil_zoclo - self.perfil_cabezal) + (0.005 * 2)
         largo_horizontal = ancho_hoja + (0.005 * 2)
-        
         if not es_gigante:
             num_vert = self.cols_hoja - 1
             num_horz = self.filas_hoja - 1
@@ -140,27 +132,6 @@ class Ventana:
 # =======================================================
 # LÓGICA EXCLUSIVA LÍNEA PREMIUM (EUROVENT)
 # =======================================================
-class VentanaEuroventS50:
-    def __init__(self, ancho, alto, diseno="2 hojas"):
-        self.ancho = ancho
-        self.alto = alto
-        self.diseno = diseno
-
-    def calcular_cortes_marco(self):
-        jamba = self.alto
-        riel_cabezal = self.ancho - 0.020
-        return round(riel_cabezal, 3), round(jamba, 3)
-
-    def calcular_hojas(self):
-        cerco_traslape = self.alto - 0.066
-        zoclo = (self.ancho / 2.0) - 0.002
-        return round(cerco_traslape, 3), round(zoclo, 3)
-
-    def calcular_vidrio(self):
-        ancho_vidrio = (self.ancho / 2.0) - 0.084
-        alto_vidrio = self.alto - 0.160
-        area = ancho_vidrio * alto_vidrio
-        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
 
 class FijoEurovent:
     def __init__(self, ancho, alto, serie="Serie 35"):
@@ -169,15 +140,130 @@ class FijoEurovent:
         self.serie = serie
 
     def calcular_cortes(self):
+        # Según manual MEC-2022, el Fijo 1 claro aplica el mismo descuento para S35, S50 y S70
         bolsa_vertical = self.alto
-        bolsa_horizontal = self.ancho - 0.090
-        return round(bolsa_vertical, 3), round(bolsa_horizontal, 3)
+        horizontales = self.ancho - 0.090 # L - 90 mm
+        return round(bolsa_vertical, 3), round(horizontales, 3)
 
     def calcular_vidrio(self):
+        # Vidrio: L - 75 mm, H - 75 mm (Aplica igual S35, S50, S70)
         ancho_vidrio = self.ancho - 0.075
         alto_vidrio = self.alto - 0.075
         area = ancho_vidrio * alto_vidrio
         return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class VentanaEuroventS50:
+    def __init__(self, ancho, alto, diseno="2 hojas (X-X / O-X)"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+
+    def calcular_cortes_marco(self):
+        jamba = self.alto
+        riel_cabezal = self.ancho - 0.020 # L - 20
+        return round(riel_cabezal, 3), round(jamba, 3)
+
+    def calcular_hojas(self):
+        cerco_traslape = self.alto - 0.066 # H - 66
+        if "3 hojas" in self.diseno:
+            zoclo = (self.ancho / 3.0) + 0.010 
+        elif "4 hojas" in self.diseno:
+            zoclo = (self.ancho / 4.0) + 0.015
+        else: # 2 hojas
+            zoclo = (self.ancho / 2.0) - 0.002 # L/2 - 2
+        return round(cerco_traslape, 3), round(zoclo, 3)
+
+    def calcular_vidrio(self):
+        alto_vidrio = self.alto - 0.160 # H - 160
+        if "3 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 3.0) - 0.070
+        elif "4 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 4.0) - 0.075
+        else: # 2 hojas
+            ancho_vidrio = (self.ancho / 2.0) - 0.084 # L/2 - 84
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class VentanaEuroventS70:
+    def __init__(self, ancho, alto, diseno="2 hojas (X-X / O-X)"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+
+    def calcular_cortes_marco(self):
+        jamba = self.alto
+        riel_cabezal = self.ancho - 0.026 # L - 26
+        return round(riel_cabezal, 3), round(jamba, 3)
+
+    def calcular_hojas(self):
+        cerco_traslape = self.alto - 0.066 # H - 66
+        if "3 hojas" in self.diseno:
+            zoclo = (self.ancho / 3.0) + 0.015
+        elif "4 hojas" in self.diseno:
+            zoclo = (self.ancho / 4.0) + 0.018
+        else: # 2 hojas
+            zoclo = (self.ancho / 2.0) # L/2
+        return round(cerco_traslape, 3), round(zoclo, 3)
+
+    def calcular_vidrio(self):
+        alto_vidrio = self.alto - 0.191 # H - 191
+        if "3 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 3.0) - 0.085
+        elif "4 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 4.0) - 0.090
+        else: # 2 hojas
+            ancho_vidrio = (self.ancho / 2.0) - 0.104 # L/2 - 104
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class VentanaProyeccionBatienteEuroventS35:
+    def __init__(self, ancho, alto, diseno="1 hoja (Proyección)", mosquitero=False):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+        self.mosquitero = mosquitero
+
+    def calcular_cortes_marco(self):
+        # Contramarco (12273): se corta al tamaño exacto perimetral (H y L)
+        return round(self.ancho, 3), round(self.alto, 3)
+
+    def calcular_hojas(self):
+        if "2 hojas" in self.diseno:
+            # Batiente 2 hojas
+            corte_ancho = (self.ancho / 2.0) - 0.038  # L/2 - 38 mm
+            corte_alto = self.alto - 0.040            # H - 40 mm
+            intermedio = self.alto - 0.048            # H - 48 mm (Perfil 12275)
+            return round(corte_alto, 3), round(corte_ancho, 3), round(intermedio, 3)
+        else:
+            # Proyección o Batiente de 1 hoja
+            corte_ancho = self.ancho - 0.048          # L - 48 mm
+            corte_alto = self.alto - 0.048            # H - 48 mm
+            return round(corte_alto, 3), round(corte_ancho, 3), 0.0
+
+    def calcular_vidrio(self):
+        if "2 hojas" in self.diseno:
+            ancho_vidrio = (self.ancho / 2.0) - 0.103 # L/2 - 103 mm
+            alto_vidrio = self.alto - 0.114           # H - 114 mm
+        else:
+            ancho_vidrio = self.ancho - 0.115         # L - 115 mm
+            alto_vidrio = self.alto - 0.115           # H - 115 mm
+            
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+    def calcular_mosquitero(self):
+        if not self.mosquitero:
+            return 0.0, 0.0
+        
+        # Mosquitero Fijo (Perfil 5173)
+        if "2 hojas" in self.diseno:
+            alto_mosq = self.alto - 0.068             # H - 68 mm
+            ancho_mosq = (self.ancho / 2.0) - 0.059   # L/2 - 59 mm
+        else:
+            alto_mosq = self.alto - 0.069             # H - 69 mm
+            ancho_mosq = self.ancho - 0.069           # L - 69 mm
+            
+        return round(alto_mosq, 3), round(ancho_mosq, 3)
 
 
 # =======================================================
