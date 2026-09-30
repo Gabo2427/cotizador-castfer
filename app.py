@@ -726,12 +726,18 @@ with col_prov1:
 with col_prov2:
     st.write("")
     with st.expander("♻️ ¿Pedacería? (Opcional)"):
-        ped_chambrana = st.text_input("Recortes Jambas/Bolsas/Contram:", "")
-        ped_cerco = st.text_input("Recortes Cercos/Traslapes:", "")
-        ped_riel = st.text_input("Recortes Rieles:", "")
-        ped_cabezal = st.text_input("Recortes Zóclos/Cabezales:", "")
-        ped_intermedio = st.text_input("Recortes Int / Mosq:", "")
-        ped_vidrio = st.text_input("Recortes Vidrio:", "")
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            ped_chambrana = st.text_input("Recortes Jambas/Chambranas:", "")
+            ped_cerco = st.text_input("Recortes Cercos:", "")
+        with col_p2:
+            ped_riel = st.text_input("Recortes Rieles:", "")
+            ped_traslape = st.text_input("Recortes Traslapes:", "")
+            ped_intermedio = st.text_input("Recortes Int / Mosq:", "")
+        with col_p3:
+            ped_cabezal = st.text_input("Recortes Cabezales de Hoja:", "")
+            ped_zoclo = st.text_input("Recortes Zóclos/Escalonados:", "")
+            ped_vidrio = st.text_input("Recortes Vidrio:", "")
 
 if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary", use_container_width=True):
     try:
