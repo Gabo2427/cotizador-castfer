@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 from collections import Counter
-from logica_cotizador import Ventana, Puerta, VentanaEuroventS50, VentanaEuroventS60, VentanaEuroventS70, FijoEurovent, FijoEuroventS60, FijoEuroventS140, VentanaProyeccionBatienteEuroventS35, PuertaComercialEuroventS50, PuertaResidencialEuroventS50
+from logica_cotizador import Ventana, Puerta, FijoNacional, VentanaEuroventS50, VentanaEuroventS60, VentanaEuroventS70, FijoEurovent, FijoEuroventS60, FijoEuroventS140, VentanaProyeccionBatienteEuroventS35, PuertaComercialEuroventS50, PuertaResidencialEuroventS50
 import db_manager
 import math
 from datetime import datetime
@@ -31,8 +31,6 @@ if 'nombre_cliente' not in st.session_state: st.session_state.nombre_cliente = "
 # ==========================================
 # FUNCIONES GLOBALES DE OPTIMIZACIÓN
 # ==========================================
-
-# 1. PARSEADOR BLINDADO (Acepta "120 x 2", comas, o saltos de línea sin crashear)
 def parsear_pedaceria(texto):
     if not texto.strip(): return []
     valores = []
@@ -56,13 +54,12 @@ def parsear_pedaceria(texto):
             except: pass
     return valores
 
-# 2. CEREBRO MATEMÁTICO COMBINATORIO (EXPRIME EL RETAZO AL MÁXIMO)
 def optimizador_aluminio_taller(cortes_list, pedaceria_str, tramo_ideal=600.0):
     pedaceria = parsear_pedaceria(pedaceria_str)
     DESPERDICIO_SIERRA = 0.3 
     
     cortes_pendientes = sorted(cortes_list, key=lambda x: x["medida"], reverse=True)
-    pedaceria_ordenada = sorted(pedaceria) # Empieza por los retazos más chicos para guardar los grandes
+    pedaceria_ordenada = sorted(pedaceria) 
     
     uso_ped = {}
 
@@ -83,24 +80,20 @@ def optimizador_aluminio_taller(cortes_list, pedaceria_str, tramo_ideal=600.0):
         mejor_w = max((w for w in range(cap_mm + 1) if elecciones[w]), default=0)
         return elecciones[mejor_w]
 
-    # Exprimir retazos primero evaluando TODAS las combinaciones
     for i, tamano_ped in enumerate(pedaceria_ordenada):
         if not cortes_pendientes: break
         
         mejores_idx = buscar_mejor_combinacion(cortes_pendientes, tamano_ped)
         if mejores_idx:
             usados = []
-            # Sacamos de la lista original las que ganaron el espacio
             for idx in sorted(mejores_idx, reverse=True):
                 usados.append(cortes_pendientes.pop(idx))
             uso_ped[i] = {"tamano": tamano_ped, "usados": usados}
 
-    # Lo que no cupo se va a tramos nuevos, usando el mismo cerebro matemático
     tramos_nuevos = []
     while cortes_pendientes:
         mejores_idx = buscar_mejor_combinacion(cortes_pendientes, tramo_ideal)
         if not mejores_idx:
-            # Seguro por si piden una pieza de más de 6m
             tramos_nuevos.append([cortes_pendientes.pop(0)])
             continue
             
@@ -304,7 +297,7 @@ else:
 col_tipo, col_detalle = st.columns(2)
 
 if sistema_seleccionado == "Línea Nacional (Estándar)":
-    tipos_disponibles = ["Ventana Corrediza", "Puerta", "Cancel de Baño"]
+    tipos_disponibles = ["Ventana Corrediza", "Puerta", "Fijo", "Cancel de Baño"]
 else:
     tipos_disponibles = ["Ventana Corrediza S50", "Ventana Corrediza S60", "Ventana Corrediza S70", 
                          "Ventana Batiente S35", "Puerta Comercial S50", "Puerta Residencial S50", 
@@ -316,7 +309,7 @@ with col_tipo:
     tipo_pieza = st.selectbox("Tipo de estructura:", tipos_disponibles, index=idx_tipo)
 
 if sistema_seleccionado == "Línea Nacional (Estándar)":
-    opciones_detalle = ["3 pulgadas", "2 pulgadas"] if tipo_pieza == "Ventana Corrediza" else ["Vivienda", "Baño"] if tipo_pieza == "Puerta" else ["Corredizo", "Abatible"]
+    opciones_detalle = ["3 pulgadas", "2 pulgadas"] if tipo_pieza in ["Ventana Corrediza", "Fijo"] else ["Vivienda", "Baño"] if tipo_pieza == "Puerta" else ["Corredizo", "Abatible"]
 else:
     if "S50" in tipo_pieza: opciones_detalle = ["Eurovent S50"]
     elif "S60" in tipo_pieza: opciones_detalle = ["Eurovent S60"]
@@ -432,7 +425,6 @@ with st.expander("📝 Piezas en el Proyecto", expanded=False):
                 txt_dis = f" - {pieza.get('diseno', '')}" if "Fijo" not in pieza['tipo'] else ""
                 txt_mosq = " (Mosquitero)" if pieza.get('mosquitero', False) else ""
                 
-                # Función de piezas entregadas (Tacha el nombre)
                 if pieza.get('entregada', False):
                     st.markdown(f"~~**P{i+1}. [{txt_sys}] {pieza['tipo']}**{txt_dis}{txt_mosq} - {round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm~~ ✅ **ENTREGADA**")
                 else:
@@ -557,7 +549,6 @@ if usar_fases:
             if st.checkbox(f"Fabricar HOY - P{i+1}: {pieza['tipo']} ({round(pieza['ancho']*100,1)}x{round(pieza['alto']*100,1)}cm)", value=True):
                 indices_activos.append(i)
 else:
-    # Si no usa fases, los activos son todos los que NO estén entregados
     indices_activos = [i for i, p in enumerate(st.session_state.proyecto) if not p.get('entregada', False)]
 
 col_prov1, col_prov2 = st.columns([1, 1])
@@ -578,7 +569,6 @@ with col_prov1:
                 for m in medidas: lista.append({"medida": m, "etiqueta": etiqueta, "activo": es_activo})
 
             for i, p in enumerate(st.session_state.proyecto):
-                # Saltar piezas entregadas para no cotizarlas al proveedor
                 if p.get('entregada', False): continue
 
                 es_activo = i in indices_activos
@@ -604,8 +594,7 @@ with col_prov1:
                             num_hojas = 2
                             if es_activo: totales["jaladera"] += 1; totales["carretilla"] += 2
                             
-                        if es_activo:
-                            totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100 
+                        if es_activo: totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100 
                         
                         if p['tipo'] == "Ventana Corrediza S50":
                             v = VentanaEuroventS50(p['ancho'], p['alto'], diseno=d_str)
@@ -624,8 +613,7 @@ with col_prov1:
                         agregar_cortes_prov(cortes_zoclo, [round(zoclo*100, 1)]*(num_hojas*2), f"Zoclo-P{num_pieza}", es_activo)
                         
                         a_v, alt_v, _ = v.calcular_vidrio()
-                        for _ in range(num_hojas):
-                            todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+                        for _ in range(num_hojas): todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
                     
                     elif "Fijo" in p['tipo']:
                         if es_activo: totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100
@@ -670,7 +658,7 @@ with col_prov1:
                         hojas_totales = 2 if "2 hojas" in d_str else 1
                         
                         if es_activo:
-                            totales["jaladera"] += 1 # 1 Cerradura
+                            totales["jaladera"] += 1 
                             totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100 * hojas_totales
                             
                         if p['tipo'] == "Puerta Comercial S50":
@@ -688,6 +676,18 @@ with col_prov1:
                         
                         a_v, alt_v, _ = v.calcular_vidrio()
                         for _ in range(hojas_totales): todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+
+                # LINEA NACIONAL ESTÁNDAR
+                elif p['tipo'] == "Fijo":
+                    if es_activo: totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100
+                    v = FijoNacional(p['ancho'], p['alto'], p['detalle'])
+                    bolsa_h, bolsa_v = v.calcular_cortes()
+                    
+                    agregar_cortes_prov(cortes_chambrana, [round(bolsa_h*100, 1), round(bolsa_h*100, 1)], f"L(Bolsa)-P{num_pieza}", es_activo)
+                    agregar_cortes_prov(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"H(Lat)-P{num_pieza}", es_activo)
+                    
+                    a_v, alt_v, _ = v.calcular_vidrio()
+                    todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
 
                 elif p['tipo'] == "Ventana Corrediza":
                     diseno = p.get('diseno', "2 hojas")
@@ -824,7 +824,7 @@ with col_prov1:
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             b64 = base64.b64encode(pdf_bytes).decode()
             with st.expander("👁️ Previsualizar Lista", expanded=True):
-                pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="450px"><p>Tu navegador bloquea la previsualización. Usa el botón de descarga abajo.</p></object>'
+                pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="450px"><p>Tu navegador bloquea la previsualización.</p></object>'
                 st.markdown(pdf_display, unsafe_allow_html=True)
             st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="Compras_CASTFER.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #6c757d; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>', unsafe_allow_html=True)
         except Exception as e: st.error(f"⚠️ Error generando PDF: {e}")
@@ -859,7 +859,6 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
             for m in medidas: lista.append({"medida": m, "etiqueta": etiqueta, "activo": es_activo})
         
         for i, p in enumerate(st.session_state.proyecto):
-            # Saltar piezas entregadas para no meterlas en los cortes
             if p.get('entregada', False): continue
 
             es_activo = i in indices_activos
@@ -951,6 +950,16 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     for _ in range(hojas_totales): todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
 
             # ------- LÓGICA NACIONAL ESTÁNDAR -------
+            elif p['tipo'] == "Fijo":
+                v = FijoNacional(p['ancho'], p['alto'], p['detalle'])
+                bolsa_h, bolsa_v = v.calcular_cortes()
+                
+                agregar_cortes_taller(cortes_chambrana, [round(bolsa_h*100, 1), round(bolsa_h*100, 1)], f"L(Bolsa)-P{num_pieza}", es_activo)
+                agregar_cortes_taller(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"H(Lat)-P{num_pieza}", es_activo)
+                
+                a_v, alt_v, _ = v.calcular_vidrio()
+                todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+
             elif p['tipo'] == "Ventana Corrediza":
                 v = Ventana(p['ancho'], p['alto'], p['detalle'], "Blanco", diseno=p.get('diseno', '2 hojas'))
                 a_m, alt_l = v.calcular_cortes_marco()
