@@ -29,26 +29,44 @@ if 'anticipo' not in st.session_state: st.session_state.anticipo = 0.0
 if 'nombre_cliente' not in st.session_state: st.session_state.nombre_cliente = ""
 
 # ==========================================
-# FUNCIONES GLOBALES DE OPTIMIZACIÓN (NUEVO BEST-FIT)
+# FUNCIONES GLOBALES DE OPTIMIZACIÓN
 # ==========================================
+
+# 1. PARSEADOR BLINDADO (Acepta "120 x 2", comas, o saltos de línea sin crashear)
 def parsear_pedaceria(texto):
     if not texto.strip(): return []
-    try: return [float(x.strip()) for x in texto.split(',') if x.strip()]
-    except: return []
+    valores = []
+    texto_limpio = texto.replace('\n', ',').replace(';', ',')
+    partes = texto_limpio.split(',')
+    
+    for p in partes:
+        p = p.strip().lower()
+        if not p: continue
+        if 'x' in p or '*' in p:
+            sep = 'x' if 'x' in p else '*'
+            sub = p.split(sep)
+            if len(sub) == 2:
+                try:
+                    medida = float(sub[0].strip())
+                    cantidad = int(sub[1].strip())
+                    for _ in range(cantidad): valores.append(medida)
+                except: pass
+        else:
+            try: valores.append(float(p))
+            except: pass
+    return valores
 
+# 2. CEREBRO MATEMÁTICO COMBINATORIO (EXPRIME EL RETAZO AL MÁXIMO)
 def optimizador_aluminio_taller(cortes_list, pedaceria_str, tramo_ideal=600.0):
     pedaceria = parsear_pedaceria(pedaceria_str)
     DESPERDICIO_SIERRA = 0.3 
     
-    # Ordenamos de mayor a menor para procesar primero los cortes críticos
     cortes_pendientes = sorted(cortes_list, key=lambda x: x["medida"], reverse=True)
-    pedaceria_ordenada = sorted(pedaceria)
+    pedaceria_ordenada = sorted(pedaceria) # Empieza por los retazos más chicos para guardar los grandes
     
-    uso_ped = {i: {"tamano": p, "usados": []} for i, p in enumerate(pedaceria_ordenada)}
+    uso_ped = {}
 
-    # ====== EL CEREBRO MATEMÁTICO (PROGRAMACIÓN DINÁMICA) ======
     def buscar_mejor_combinacion(cortes_disp, capacidad_cm):
-        # Convertimos a milímetros enteros para precisión matemática
         cap_mm = int(round(capacidad_cm * 10))
         dp = [0] * (cap_mm + 1)
         elecciones = [[] for _ in range(cap_mm + 1)]
@@ -57,43 +75,38 @@ def optimizador_aluminio_taller(cortes_list, pedaceria_str, tramo_ideal=600.0):
             peso_mm = int(round((c["medida"] + DESPERDICIO_SIERRA) * 10))
             if peso_mm > cap_mm: continue
             
-            # Recorremos de atrás hacia adelante para evaluar combinaciones
             for w in range(cap_mm, peso_mm - 1, -1):
                 if dp[w - peso_mm] + peso_mm > dp[w]:
                     dp[w] = dp[w - peso_mm] + peso_mm
                     elecciones[w] = elecciones[w - peso_mm] + [i]
                     
-        # Encontramos la combinación que llenó más espacio (dejó menos sobrante)
         mejor_w = max((w for w in range(cap_mm + 1) if elecciones[w]), default=0)
         return elecciones[mejor_w]
 
-    # 1. EXPRIMIR LA PEDACERÍA PRIMERO
-    for i in range(len(pedaceria_ordenada)):
+    # Exprimir retazos primero evaluando TODAS las combinaciones
+    for i, tamano_ped in enumerate(pedaceria_ordenada):
         if not cortes_pendientes: break
-        capacidad_ped = pedaceria_ordenada[i]
         
-        # El algoritmo evalúa miles de combinaciones y nos regresa los índices ganadores
-        mejores_idx = buscar_mejor_combinacion(cortes_pendientes, capacidad_ped)
-        
-        # Sacamos los cortes ganadores de la lista (en reversa para no alterar el orden)
-        for idx in sorted(mejores_idx, reverse=True):
-            uso_ped[i]["usados"].append(cortes_pendientes.pop(idx))
+        mejores_idx = buscar_mejor_combinacion(cortes_pendientes, tamano_ped)
+        if mejores_idx:
+            usados = []
+            # Sacamos de la lista original las que ganaron el espacio
+            for idx in sorted(mejores_idx, reverse=True):
+                usados.append(cortes_pendientes.pop(idx))
+            uso_ped[i] = {"tamano": tamano_ped, "usados": usados}
 
-    # 2. LOS CORTES QUE SOBRARON SE VAN A TRAMOS NUEVOS DE 6 METROS
+    # Lo que no cupo se va a tramos nuevos, usando el mismo cerebro matemático
     tramos_nuevos = []
     while cortes_pendientes:
-        # Volvemos a usar el algoritmo combinatorio para aprovechar el tramo de 6m al máximo
         mejores_idx = buscar_mejor_combinacion(cortes_pendientes, tramo_ideal)
-        
         if not mejores_idx:
-            # Seguro de vida por si algún arquitecto pide una ventana de más de 6m
+            # Seguro por si piden una pieza de más de 6m
             tramos_nuevos.append([cortes_pendientes.pop(0)])
             continue
             
         tramo_actual = []
         for idx in sorted(mejores_idx, reverse=True):
             tramo_actual.append(cortes_pendientes.pop(idx))
-            
         tramos_nuevos.append(tramo_actual)
         
     return tramos_nuevos, uso_ped
@@ -421,9 +434,9 @@ with st.expander("📝 Piezas en el Proyecto", expanded=False):
                 
                 # Función de piezas entregadas (Tacha el nombre)
                 if pieza.get('entregada', False):
-                    st.markdown(f"~~**{i+1}. [{txt_sys}] {pieza['tipo']}**{txt_dis}{txt_mosq} - {round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm~~ ✅ **ENTREGADA**")
+                    st.markdown(f"~~**P{i+1}. [{txt_sys}] {pieza['tipo']}**{txt_dis}{txt_mosq} - {round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm~~ ✅ **ENTREGADA**")
                 else:
-                    st.markdown(f"**{i+1}. [{txt_sys}] {pieza['tipo']}**{txt_dis}{txt_mosq} - {round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm")
+                    st.markdown(f"**P{i+1}. [{txt_sys}] {pieza['tipo']}**{txt_dis}{txt_mosq} - {round(pieza['ancho']*100, 1)} x {round(pieza['alto']*100, 1)} cm")
             
             with col_status:
                 if st.button("✅ Entregar" if not pieza.get('entregada', False) else "🔄 Deshacer", key=f"entregar_{i}", type="secondary"):
@@ -467,7 +480,6 @@ if st.session_state.get('admin', False):
             col_texto, col_precio = st.columns([3, 1])
             with col_texto:
                 area = pieza['ancho'] * pieza['alto']
-                # Se sigue cotizando todo aunque ya se haya entregado
                 st.markdown(f"<br>**P{i+1}:** {pieza['tipo']} ({round(pieza['ancho']*100, 1)}x{round(pieza['alto']*100, 1)}cm) - *{round(area, 2)} m²*", unsafe_allow_html=True)
             with col_precio:
                 precio_actual = pieza.get('precio', 0.0)
@@ -566,7 +578,7 @@ with col_prov1:
                 for m in medidas: lista.append({"medida": m, "etiqueta": etiqueta, "activo": es_activo})
 
             for i, p in enumerate(st.session_state.proyecto):
-                # Saltar las piezas que ya fueron marcadas como entregadas
+                # Saltar piezas entregadas para no cotizarlas al proveedor
                 if p.get('entregada', False): continue
 
                 es_activo = i in indices_activos
@@ -812,7 +824,7 @@ with col_prov1:
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             b64 = base64.b64encode(pdf_bytes).decode()
             with st.expander("👁️ Previsualizar Lista", expanded=True):
-                pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="450px"><p>Tu navegador bloquea la previsualización.</p></object>'
+                pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="450px"><p>Tu navegador bloquea la previsualización. Usa el botón de descarga abajo.</p></object>'
                 st.markdown(pdf_display, unsafe_allow_html=True)
             st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="Compras_CASTFER.pdf" target="_blank" style="text-decoration: none; padding: 10px; background-color: #6c757d; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%;">🛒 Descargar PDF de Compras</a>', unsafe_allow_html=True)
         except Exception as e: st.error(f"⚠️ Error generando PDF: {e}")
@@ -820,19 +832,20 @@ with col_prov1:
 # =============== GUÍA DE CORTES PDF ===============
 with col_prov2:
     st.write("")
-    with st.expander("♻️ ¿Pedacería? (Opcional)"):
+    st.info("💡 **TIP DE TALLER:** Para meter retazos, sepáralos con comas o saltos de línea. Puedes escribir medidas repetidas así: `123.5 x 2` o `64 * 3`.")
+    with st.expander("♻️ ¿Pedacería en Taller? (Opcional)"):
         col_p1, col_p2, col_p3 = st.columns(3)
         with col_p1:
-            ped_chambrana = st.text_input("Recortes Jambas/Bolsas:", "")
-            ped_cerco = st.text_input("Recortes Cercos:", "")
+            ped_chambrana = st.text_area("Jambas/Bolsas:", height=68, placeholder="Ej: 120.5\n65 x 2")
+            ped_cerco = st.text_area("Cercos:", height=68)
         with col_p2:
-            ped_riel = st.text_input("Recortes Rieles:", "")
-            ped_traslape = st.text_input("Recortes Traslapes:", "")
-            ped_intermedio = st.text_input("Recortes Int / Mosq:", "")
+            ped_riel = st.text_area("Rieles:", height=68)
+            ped_traslape = st.text_area("Traslapes:", height=68)
+            ped_intermedio = st.text_area("Int / Mosq:", height=68)
         with col_p3:
-            ped_cabezal = st.text_input("Recortes Cabezales Hoja:", "")
-            ped_zoclo = st.text_input("Recortes Zóclos/Escalonados:", "")
-            ped_vidrio = st.text_input("Recortes Vidrio:", "")
+            ped_cabezal = st.text_area("Cabezales Hoja:", height=68)
+            ped_zoclo = st.text_area("Zóclos / Escal.:", height=68)
+            ped_vidrio = st.text_area("Recortes Vidrio:", height=68, placeholder="Ej: 40x50\n80x120")
 
 if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary", use_container_width=True):
     try:
@@ -846,7 +859,7 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
             for m in medidas: lista.append({"medida": m, "etiqueta": etiqueta, "activo": es_activo})
         
         for i, p in enumerate(st.session_state.proyecto):
-            # Saltar las piezas entregadas
+            # Saltar piezas entregadas para no meterlas en los cortes
             if p.get('entregada', False): continue
 
             es_activo = i in indices_activos
@@ -1008,7 +1021,6 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                 pdf.multi_cell(0, 6, texto)
                 pdf.ln(1)
 
-        # CORRECCIÓN DE VARIABLES AL LLAMAR AL PDF
         pdf_imprimir_perfil("Jambas / Bolsas / Contramarcos", cortes_chambrana, ped_chambrana)
         pdf_imprimir_perfil("Rieles", cortes_riel, ped_riel)
         pdf_imprimir_perfil("Cercos / Marco Hoja Vertical", cortes_cerco, ped_cerco)
