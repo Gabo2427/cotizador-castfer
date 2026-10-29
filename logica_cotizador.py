@@ -29,6 +29,9 @@ class Ventana:
         self.intermedio_frente = 0.036 
         self.intermedio_fondo = 0.026  
         
+        # 👇 AQUÍ ESTÁ LA CORRECCIÓN: Holgura para el cristal en cuadrícula
+        self.holgura_vidrio = 0.015
+        
         if self.linea_aluminio == "3 pulgadas":
             self.desc_ancho_hoja = 0.190
             self.perfil_cerco_traslape = 0.065 
