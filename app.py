@@ -1016,99 +1016,98 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     armar_hoja_taller(f"CorNrm-P{num_pieza}", hojas["corr_normal"])
                     armar_hoja_taller(f"CorDbl-P{num_pieza}", hojas["corr_doble"])
 
-   pdf = FPDF()
-            pdf.add_page()
-            try: pdf.image("logopagina.png", x=10, y=8, w=54)
-            except: pass 
-            pdf.set_font("Arial", 'B', 16)
-            pdf.cell(0, 10, "GUIA DE CORTES - MESA DE TRABAJO", ln=True, align='R')
-            pdf.set_font("Arial", '', 11)
-            pdf.cell(0, 6, f"Cliente: {st.session_state.nombre_cliente}", ln=True, align='R')
-            pdf.ln(10)
+        pdf = FPDF()
+        pdf.add_page()
+        try: pdf.image("logopagina.png", x=10, y=8, w=54)
+        except: pass 
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, "GUIA DE CORTES - MESA DE TRABAJO", ln=True, align='R')
+        pdf.set_font("Arial", '', 11)
+        pdf.cell(0, 6, f"Cliente: {st.session_state.nombre_cliente}", ln=True, align='R')
+        pdf.ln(10)
 
-            def pdf_imprimir_perfil(titulo, lista_cortes, ped_str):
-                if not lista_cortes: return
-                tramos, ped_usada = optimizador_aluminio_taller(lista_cortes, ped_str)
-                if not any(c.get('activo', True) for c in lista_cortes): return
-                pdf.set_font("Arial", 'B', 11)
-                pdf.set_fill_color(220, 220, 220)
-                pdf.cell(0, 8, f" {titulo.upper()}", ln=True, fill=True)
+        def pdf_imprimir_perfil(titulo, lista_cortes, ped_str):
+            if not lista_cortes: return
+            tramos, ped_usada = optimizador_aluminio_taller(lista_cortes, ped_str)
+            if not any(c.get('activo', True) for c in lista_cortes): return
+            pdf.set_font("Arial", 'B', 11)
+            pdf.set_fill_color(220, 220, 220)
+            pdf.cell(0, 8, f" {titulo.upper()}", ln=True, fill=True)
+            pdf.set_font("Arial", '', 10)
+            
+            for p_idx, p_data in ped_usada.items():
+                activos = [u for u in p_data["usados"] if u.get('activo', True)]
+                pendientes = [u for u in p_data["usados"] if not u.get('activo', True)]
+                if not activos: continue
+                usados_act = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in activos])
+                usados_pend = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in pendientes])
+                sobra = p_data["tamano"] - (sum([u['medida'] for u in p_data["usados"]]) + len(p_data["usados"])*0.3)
+                texto = f"  * De retazo de {p_data['tamano']}cm:\n      -> CORTA HOY: {usados_act}\n" if usar_fases else f"  * De retazo de {p_data['tamano']}cm:\n      Corta: {usados_act}\n"
+                if usar_fases and usados_pend: texto += f"      -> GUARDA (Futuro): {usados_pend}\n"
+                texto += f"      -> Sobrante: {round(sobra,1)}cm"
+                pdf.multi_cell(0, 6, texto)
+                pdf.ln(1)
+            
+            for i, tramo in enumerate(tramos):
+                activos = [u for u in tramo if u.get('activo', True)]
+                pendientes = [u for u in tramo if not u.get('activo', True)]
+                if not activos: continue
+                usados_act = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in activos])
+                usados_pend = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in pendientes])
+                sobra = 600.0 - (sum([u['medida'] for u in tramo]) + len(tramo)*0.3)
+                texto = f"  * Tramo {i+1} (6.00m):\n      -> CORTA HOY: {usados_act}\n" if usar_fases else f"  * Tramo {i+1} (6.00m):\n      Corta: {usados_act}\n"
+                if usar_fases and usados_pend: texto += f"      -> GUARDA (Futuro): {usados_pend}\n"
+                texto += f"      -> Sobrante: {round(sobra,1)}cm"
+                pdf.multi_cell(0, 6, texto)
+                pdf.ln(1)
+
+        pdf_imprimir_perfil("Jambas / Bolsas / Contramarcos", cortes_chambrana, ped_chambrana)
+        pdf_imprimir_perfil("Rieles", cortes_riel, ped_riel)
+        pdf_imprimir_perfil("Cercos / Marco Hoja Vertical", cortes_cerco, ped_cerco)
+        pdf_imprimir_perfil("Traslapes", cortes_traslape, ped_traslape)
+        pdf_imprimir_perfil("Cabezales / Marco Hoja Horizontal", cortes_cabezal, ped_cabezal)
+        pdf_imprimir_perfil("Zoclos / Escalonados", cortes_zoclo, ped_zoclo)
+        pdf_imprimir_perfil("Intermedios y Mosquiteros", cortes_intermedio + cortes_mosquitero, ped_intermedio)
+
+        pdf.ln(5)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.set_fill_color(200, 220, 255)
+        pdf.cell(0, 8, " MESA DE CRISTAL / VIDRIO", ln=True, fill=True)
+        pdf.ln(4)
+        
+        if todos_los_vidrios_taller:
+            hojas_vidrio, vidrios_rescatados, best_config = optimizador_vidrio(todos_los_vidrios_taller, ped_vidrio)
+            
+            if any(r['pieza'].get('activo', True) for r in vidrios_rescatados):
+                pdf.set_font("Arial", 'B', 10)
+                pdf.cell(0, 6, "RECORTES DEL TALLER:", ln=True)
                 pdf.set_font("Arial", '', 10)
-                
-                for p_idx, p_data in ped_usada.items():
-                    activos = [u for u in p_data["usados"] if u.get('activo', True)]
-                    pendientes = [u for u in p_data["usados"] if not u.get('activo', True)]
-                    if not activos: continue
-                    usados_act = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in activos])
-                    usados_pend = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in pendientes])
-                    sobra = p_data["tamano"] - (sum([u['medida'] for u in p_data["usados"]]) + len(p_data["usados"])*0.3)
-                    texto = f"  * De retazo de {p_data['tamano']}cm:\n      -> CORTA HOY: {usados_act}\n" if usar_fases else f"  * De retazo de {p_data['tamano']}cm:\n      Corta: {usados_act}\n"
-                    if usar_fases and usados_pend: texto += f"      -> GUARDA (Futuro): {usados_pend}\n"
-                    texto += f"      -> Sobrante: {round(sobra,1)}cm"
-                    pdf.multi_cell(0, 6, texto)
-                    pdf.ln(1)
-                
-                for i, tramo in enumerate(tramos):
-                    activos = [u for u in tramo if u.get('activo', True)]
-                    pendientes = [u for u in tramo if not u.get('activo', True)]
-                    if not activos: continue
-                    usados_act = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in activos])
-                    usados_pend = ", ".join([f"{u['medida']}cm ({u['etiqueta']})" for u in pendientes])
-                    sobra = 600.0 - (sum([u['medida'] for u in tramo]) + len(tramo)*0.3)
-                    texto = f"  * Tramo {i+1} (6.00m):\n      -> CORTA HOY: {usados_act}\n" if usar_fases else f"  * Tramo {i+1} (6.00m):\n      Corta: {usados_act}\n"
-                    if usar_fases and usados_pend: texto += f"      -> GUARDA (Futuro): {usados_pend}\n"
-                    texto += f"      -> Sobrante: {round(sobra,1)}cm"
-                    pdf.multi_cell(0, 6, texto)
-                    pdf.ln(1)
+                for r in vidrios_rescatados:
+                    if r["pieza"].get('activo', True) or not usar_fases:
+                        pdf.cell(0, 6, f"  - Del retazo {r['pedazo']['original']}: Cortar {r['pieza']['w']} x {r['pieza']['h']} cm ({r['pieza']['etiqueta']})", ln=True)
+                pdf.ln(3)
 
-            pdf_imprimir_perfil("Jambas / Bolsas / Contramarcos", cortes_chambrana, ped_chambrana)
-            pdf_imprimir_perfil("Rieles", cortes_riel, ped_riel)
-            pdf_imprimir_perfil("Cercos / Marco Hoja Vertical", cortes_cerco, ped_cerco)
-            pdf_imprimir_perfil("Traslapes", cortes_traslape, ped_traslape)
-            pdf_imprimir_perfil("Cabezales / Marco Hoja Horizontal", cortes_cabezal, ped_cabezal)
-            pdf_imprimir_perfil("Zoclos / Escalonados", cortes_zoclo, ped_zoclo)
-            pdf_imprimir_perfil("Intermedios y Mosquiteros", cortes_intermedio + cortes_mosquitero, ped_intermedio)
-
-            pdf.ln(5)
-            pdf.set_font("Arial", 'B', 12)
-            pdf.set_fill_color(200, 220, 255)
-            pdf.cell(0, 8, " MESA DE CRISTAL / VIDRIO", ln=True, fill=True)
-            pdf.ln(4)
-            
-            if todos_los_vidrios_taller:
-                hojas_vidrio, vidrios_rescatados, best_config = optimizador_vidrio(todos_los_vidrios_taller, ped_vidrio)
-                
-                if any(r['pieza'].get('activo', True) for r in vidrios_rescatados):
+            if hojas_vidrio:
+                pdf.set_font("Arial", 'B', 11)
+                pdf.cell(0, 8, f"HOJAS NUEVAS ({int(best_config['ancho'])}x260 cm):", ln=True)
+                pdf.set_font("Arial", '', 10)
+                for i, h in enumerate(hojas_vidrio):
+                    if not any(p.get('activo', True) for col in h['columnas'] for p in col['piezas']): continue
                     pdf.set_font("Arial", 'B', 10)
-                    pdf.cell(0, 6, "RECORTES DEL TALLER:", ln=True)
+                    pdf.cell(0, 6, f" >> HOJA {i+1}:", ln=True)
                     pdf.set_font("Arial", '', 10)
-                    for r in vidrios_rescatados:
-                        if r["pieza"].get('activo', True) or not usar_fases:
-                            pdf.cell(0, 6, f"  - Del retazo {r['pedazo']['original']}: Cortar {r['pieza']['w']} x {r['pieza']['h']} cm ({r['pieza']['etiqueta']})", ln=True)
-                    pdf.ln(3)
+                    for j, col in enumerate(h['columnas']):
+                        for p in col['piezas']:
+                            txt_act = " [CORTA HOY]" if usar_fases and p.get('activo') else " [GUARDA]" if usar_fases else ""
+                            pdf.cell(0, 6, f"      [ ] {p['w']} x {p['h']} cm   (Mrc: {p['etiqueta']}){txt_act}", ln=True)
+                    pdf.ln(2)
 
-                if hojas_vidrio:
-                    pdf.set_font("Arial", 'B', 11)
-                    pdf.cell(0, 8, f"HOJAS NUEVAS ({int(best_config['ancho'])}x260 cm):", ln=True)
-                    pdf.set_font("Arial", '', 10)
-                    for i, h in enumerate(hojas_vidrio):
-                        if not any(p.get('activo', True) for col in h['columnas'] for p in col['piezas']): continue
-                        pdf.set_font("Arial", 'B', 10)
-                        pdf.cell(0, 6, f" >> HOJA {i+1}:", ln=True)
-                        pdf.set_font("Arial", '', 10)
-                        for j, col in enumerate(h['columnas']):
-                            for p in col['piezas']:
-                                txt_act = " [CORTA HOY]" if usar_fases and p.get('activo') else " [GUARDA]" if usar_fases else ""
-                                pdf.cell(0, 6, f"      [ ] {p['w']} x {p['h']} cm   (Mrc: {p['etiqueta']}){txt_act}", ln=True)
-                        pdf.ln(2)
-
-            pdf_bytes = pdf.output(dest='S').encode('latin-1')
-            b64 = base64.b64encode(pdf_bytes).decode()
-            with st.expander("👁️ Previsualizar Guía", expanded=True):
-                pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="700px"><p>Tu navegador bloquea la previsualización.</p></object>'
-                st.markdown(pdf_display, unsafe_allow_html=True)
-            st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="Guia_Cortes.pdf" target="_blank" style="text-decoration: none; padding: 12px; background-color: #007bff; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%; font-size: 16px; font-weight: bold;">📥 Descargar Guía</a>', unsafe_allow_html=True)
-            st.balloons()
-            
-        except Exception as e:
-            st.error(f"Error: {e}")
+        pdf_bytes = pdf.output(dest='S').encode('latin-1')
+        b64 = base64.b64encode(pdf_bytes).decode()
+        with st.expander("👁️ Previsualizar Guía", expanded=True):
+            pdf_display = f'<object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="700px"><p>Tu navegador bloquea la previsualización.</p></object>'
+            st.markdown(pdf_display, unsafe_allow_html=True)
+        st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="Guia_Cortes.pdf" target="_blank" style="text-decoration: none; padding: 12px; background-color: #007bff; color: white; border-radius: 5px; display: inline-block; text-align: center; width: 100%; font-size: 16px; font-weight: bold;">📥 Descargar Guía</a>', unsafe_allow_html=True)
+        st.balloons()
+    except Exception as e:
+        st.error(f"Error: {e}")
