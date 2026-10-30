@@ -251,8 +251,23 @@ with st.sidebar:
             elif len(st.session_state.proyecto) == 0:
                 st.warning("⚠️ No hay piezas.")
             else:
-                db_manager.guardar_proyecto(st.session_state.nombre_cliente, st.session_state.proyecto, st.session_state.costo_total, st.session_state.anticipo)
-                st.success(f"¡Guardado!")
+                if st.session_state.proyecto_activo_id is not None:
+                    db_manager.actualizar_proyecto(
+                        st.session_state.proyecto_activo_id,
+                        st.session_state.nombre_cliente,
+                        st.session_state.proyecto,
+                        st.session_state.costo_total,
+                        st.session_state.anticipo,
+                    )
+                    st.success("✅ ¡Proyecto actualizado correctamente!")
+                else:
+                    db_manager.guardar_proyecto(
+                        st.session_state.nombre_cliente,
+                        st.session_state.proyecto,
+                        st.session_state.costo_total,
+                        st.session_state.anticipo,
+                    )
+                    st.success("✅ ¡Proyecto guardado como nuevo!")
 
         if proyectos_guardados:
             if st.button("🗑️ Borrar Seleccionado", use_container_width=True):
