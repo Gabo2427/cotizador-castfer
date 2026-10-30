@@ -1,4 +1,5 @@
-🪟 Cotizador CASTFER - Sistema Inteligente para Taller de Aluminio
+🪟 Cotizador CASTFER 
+- Sistema Inteligente para Taller de Aluminio
 Plataforma web desarrollada en Python y Streamlit diseñada para optimizar y administrar operaciones de un taller de aluminio y vidrio. El sistema abarca desde la cotización inicial para el cliente hasta la generación de algoritmos de pedacería y despiece milimétrico para la mesa de trabajo.
 
 🚀 Características Principales
