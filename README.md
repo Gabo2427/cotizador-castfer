@@ -1,26 +1,27 @@
 🪟 Cotizador CASTFER 
 - Sistema Inteligente para Taller de Aluminio
+
 Plataforma web desarrollada en Python y Streamlit diseñada para optimizar y administrar operaciones de un taller de aluminio y vidrio. El sistema abarca desde la cotización inicial para el cliente hasta la generación de algoritmos de pedacería y despiece milimétrico para la mesa de trabajo.
 
 🚀 Características Principales
--Sistemas de Manufactura Integrados: Soporte algorítmico para cálculos de Línea Nacional (Estándar) y Línea Premium (Eurovent S35, S50, S60, S70, S140), incluyendo holguras precisas y perfiles específicos.
--Motor de Optimización (1D y 2D):
-  -Aluminio (1D): Algoritmo de corte lineal que maximiza el uso de tramos de 6 metros e incorpora retazos existentes (pedacería) para minimizar el desperdicio.
-  -Cristal (2D): Algoritmo tipo Tetris (Bin Packing) para el acomodo inteligente de piezas de vidrio en hojas estándar (ej. 180x260 cm y 230x260 cm).
--Generación Automática de PDFs:
-  -Recibo de Cliente: Cotización formal con desglose financiero, anticipos y saldos pendientes.
-  -Orden de Compra (Proveedor): Lista exacta de tramos de 6m a comprar, herrajes (carretillas, jaladeras), metros de vinil y hojas de cristal.
-  -Guía de Mesa de Trabajo: Documento detallado para el armador con instrucciones de cortes exactos, uso de retazos y sobrantes esperados.
--Control de Producción por Fases: Permite seleccionar qué piezas específicas se van a "Fabricar HOY", ajustando la lista de materiales y cortes dinámicamente.
--Gestión de Base de Datos: Guardado, carga y actualización de proyectos en tiempo real mediante SQLite local, evitando duplicidad de registros.
--Modo Administrador: Acceso protegido mediante PIN de seguridad para gestionar precios por $m^2$, anticipos y finanzas globales.
+- Sistemas de Manufactura Integrados: Soporte algorítmico para cálculos de Línea Nacional (Estándar) y Línea Premium (Eurovent S35, S50, S60, S70, S140), incluyendo holguras precisas y perfiles específicos.
+- Motor de Optimización (1D y 2D):
+  - Aluminio (1D): Algoritmo de corte lineal que maximiza el uso de tramos de 6 metros e incorpora retazos existentes (pedacería) para minimizar el desperdicio.
+  - Cristal (2D): Algoritmo tipo Tetris (Bin Packing) para el acomodo inteligente de piezas de vidrio en hojas estándar (ej. 180x260 cm y 230x260 cm).
+- Generación Automática de PDFs:
+  - Recibo de Cliente: Cotización formal con desglose financiero, anticipos y saldos pendientes.
+  - Orden de Compra (Proveedor): Lista exacta de tramos de 6m a comprar, herrajes (carretillas, jaladeras), metros de vinil y hojas de cristal.
+  - Guía de Mesa de Trabajo: Documento detallado para el armador con instrucciones de cortes exactos, uso de retazos y sobrantes esperados.
+- Control de Producción por Fases: Permite seleccionar qué piezas específicas se van a "Fabricar HOY", ajustando la lista de materiales y cortes dinámicamente.
+- Gestión de Base de Datos: Guardado, carga y actualización de proyectos en tiempo real mediante SQLite local, evitando duplicidad de registros.
+- Modo Administrador: Acceso protegido mediante PIN de seguridad para gestionar precios por $m^2$, anticipos y finanzas globales.
 
 🛠️ Tecnologías Utilizadas
--Frontend & Framework: Streamlit (UI reactiva e interactiva).
--Backend: Python 3.x
--Base de Datos: SQLite3 (db_manager.py)
--Generación de Reportes: fpdf2 (Renderizado de PDFs en base64 nativo).
--Algoritmos de Cálculo: Lógica orientada a objetos (logica_cotizador.py) con clases especializadas por tipo de ventana y puerta.
+- Frontend & Framework: Streamlit (UI reactiva e interactiva).
+- Backend: Python 3.x
+- Base de Datos: SQLite3 (db_manager.py)
+- Generación de Reportes: fpdf2 (Renderizado de PDFs en base64 nativo).
+- Algoritmos de Cálculo: Lógica orientada a objetos (logica_cotizador.py) con clases especializadas por tipo de ventana y puerta.
 
 ⚙️ Instalación y Uso Local
 
