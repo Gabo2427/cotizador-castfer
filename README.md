@@ -38,6 +38,7 @@ cd cotizador-castfer
   La aplicación se abrirá automáticamente en tu navegador web por defecto (usualmente en http://localhost:8501).
 
 📂 Estructura del Proyecto
+
 cotizador-castfer/
 │
 ├── app.py                  # Archivo principal de Streamlit (Interfaz y Controladores)
