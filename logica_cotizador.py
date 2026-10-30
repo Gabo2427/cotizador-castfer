@@ -403,3 +403,4 @@ class PuertaResidencialEuroventS50:
             alto_vidrio = self.alto - 0.349
         area = ancho_vidrio * alto_vidrio
         return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+    
