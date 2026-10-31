@@ -1095,10 +1095,7 @@ with col_prov1:
                             a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
                             todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl, "activo": es_activo})
                             
-                    if "2 hojas (O-X)" in diseno:
-                        prov_hoja(f"Fija-P{num_pieza}", hojas["fija"], es_centro=True)
-                        prov_hoja(f"Corr-P{num_pieza}", hojas["corrediza"], es_centro=False)
-                    elif "2 hojas (X-X)" in diseno:
+                    if "2 hojas (X-X)" in diseno:
                         prov_hoja(f"CorIzq-P{num_pieza}", hojas["corr_izq"], es_centro=False)
                         prov_hoja(f"CorDer-P{num_pieza}", hojas["corr_der"], es_centro=False)
                     elif "3 hojas (X-O-X" in diseno:
@@ -1113,6 +1110,9 @@ with col_prov1:
                         prov_hoja(f"FijGig-P{num_pieza}", hojas["fija_gigante"], es_centro=True)
                         prov_hoja(f"CorIzq-P{num_pieza}", hojas["corrediza_izq"], es_centro=False)
                         prov_hoja(f"CorDer-P{num_pieza}", hojas["corrediza_der"], es_centro=False)
+                    else: # Captura "2 hojas (O-X)" y los diseños antiguos de "2 hojas"
+                        prov_hoja(f"Fija-P{num_pieza}", hojas["fija"], es_centro=True)
+                        prov_hoja(f"Corr-P{num_pieza}", hojas["corrediza"], es_centro=False)
                         
                 elif p['tipo'] == "Puerta":
                     puerta = Puerta(p['ancho'], p['alto'], p['detalle'], "Blanco")
@@ -1362,10 +1362,7 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                         a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
                         todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl, "activo": es_activo})
 
-                if "2 hojas (O-X)" in diseno:
-                    armar_hoja_taller(f"Fija-P{num_pieza}", hojas["fija"], es_centro=True)
-                    armar_hoja_taller(f"Corr-P{num_pieza}", hojas["corrediza"], es_centro=False)
-                elif "2 hojas (X-X)" in diseno:
+                if "2 hojas (X-X)" in diseno:
                     armar_hoja_taller(f"CorIzq-P{num_pieza}", hojas["corr_izq"], es_centro=False)
                     armar_hoja_taller(f"CorDer-P{num_pieza}", hojas["corr_der"], es_centro=False)
                 elif "3 hojas (X-O-X" in diseno:
@@ -1380,6 +1377,9 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     armar_hoja_taller(f"FijGig-P{num_pieza}", hojas["fija_gigante"], es_centro=True)
                     armar_hoja_taller(f"CorIzq-P{num_pieza}", hojas["corrediza_izq"], es_centro=False)
                     armar_hoja_taller(f"CorDer-P{num_pieza}", hojas["corrediza_der"], es_centro=False)
+                else: # Captura "2 hojas (O-X)" y los diseños antiguos de "2 hojas"
+                    armar_hoja_taller(f"Fija-P{num_pieza}", hojas["fija"], es_centro=True)
+                    armar_hoja_taller(f"Corr-P{num_pieza}", hojas["corrediza"], es_centro=False)
 
         pdf = FPDF()
         pdf.add_page()
