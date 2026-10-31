@@ -1,7 +1,6 @@
 import streamlit as st
 import json
 from collections import Counter
-from logica_cotizador import Ventana, Puerta, FijoNacional, VentanaEuroventS50, VentanaEuroventS60, VentanaEuroventS70, FijoEurovent, FijoEuroventS60, FijoEuroventS140, VentanaProyeccionBatienteEuroventS35, PuertaComercialEuroventS50, PuertaResidencialEuroventS50
 import db_manager
 import math
 from datetime import datetime
@@ -27,6 +26,331 @@ if 'proyecto_activo_id' not in st.session_state: st.session_state.proyecto_activ
 if 'costo_total' not in st.session_state: st.session_state.costo_total = 0.0
 if 'anticipo' not in st.session_state: st.session_state.anticipo = 0.0
 if 'nombre_cliente' not in st.session_state: st.session_state.nombre_cliente = ""
+
+# =======================================================
+# CLASES DE LÓGICA MATEMÁTICA (INTEGRADAS)
+# =======================================================
+class Ventana:
+    def __init__(self, ancho, alto, linea_aluminio, color, division_horizontal=False, diseno="2 hojas (O-X)", cuadricula=False, tipo_cuadricula="2x3"):
+        self.ancho = ancho
+        self.alto = alto
+        self.linea_aluminio = linea_aluminio
+        self.color = color
+        self.division_horizontal = division_horizontal
+        self.diseno = diseno
+        self.cuadricula = cuadricula
+        self.tipo_cuadricula = tipo_cuadricula
+        
+        if self.cuadricula:
+            try:
+                c_str, r_str = self.tipo_cuadricula.split('x')
+                self.cols_hoja = int(c_str)
+                self.filas_hoja = int(r_str)
+            except:
+                self.cols_hoja = 2
+                self.filas_hoja = 3
+        else:
+            self.cols_hoja = 1
+            self.filas_hoja = 1
+
+        self.intermedio_frente = 0.036 
+        self.intermedio_fondo = 0.026  
+        self.holgura_vidrio = 0.0075
+        
+        if self.linea_aluminio == "3 pulgadas":
+            self.desc_ancho_hoja = 0.190
+            self.perfil_cerco_traslape = 0.065 
+            self.perfil_zoclo = 0.060          
+            self.perfil_cabezal = 0.036        
+            self.descuento_marco_alto = 0.032  
+            self.desc_4_hojas = 0.280 
+            self.desc_3_hojas = 0.231
+        else:
+            self.desc_ancho_hoja = 0.151       
+            self.perfil_cerco_traslape = 0.043 
+            self.perfil_zoclo = 0.070          
+            self.perfil_cabezal = 0.035        
+            self.descuento_marco_alto = 0.025  
+            self.desc_4_hojas = 0.220 
+            self.desc_3_hojas = 0.180 
+
+    def calcular_cortes_marco(self):
+        ancho_horizontal = self.ancho - 0.005 
+        alto_lateral = self.alto - self.descuento_marco_alto
+        return round(ancho_horizontal, 3), round(alto_lateral, 3)
+
+    def calcular_hoja_fija(self):
+        if "Fijo Gigante Centro" in self.diseno:
+            ancho_sencillo = (self.ancho - self.desc_4_hojas) / 4
+            corte_ancho = ancho_sencillo * 2
+        else:
+            corte_ancho = (self.ancho - self.desc_ancho_hoja) / 2
+        
+        if self.division_horizontal:
+            luz_libre_total = self.alto - self.descuento_marco_alto - self.intermedio_fondo
+            corte_alto = (luz_libre_total / 2) + self.intermedio_fondo
+        else:
+            corte_alto = self.alto - (0.035 if self.linea_aluminio == "3 pulgadas" else 0.030)
+            
+        return round(corte_alto, 3), round(corte_ancho, 3)
+
+    def calcular_hoja_corrediza(self):
+        alto_fija, ancho_fija = self.calcular_hoja_fija()
+        if "Fijo Gigante Centro" in self.diseno:
+            corte_ancho = (self.ancho - self.desc_4_hojas) / 4
+        else:
+            corte_ancho = ancho_fija
+        corte_alto = alto_fija - 0.005
+        return round(corte_alto, 3), round(corte_ancho, 3)
+
+    def calcular_hojas(self):
+        if "Fijo Gigante Centro" in self.diseno:
+            alto_fija, ancho_fija = self.calcular_hoja_fija()
+            alto_corr, ancho_corr = self.calcular_hoja_corrediza()
+            return {
+                "fija_gigante": (round(alto_fija, 3), round(ancho_fija, 3)),
+                "corrediza_izq": (round(alto_corr, 3), round(ancho_corr, 3)),
+                "corrediza_der": (round(alto_corr, 3), round(ancho_corr, 3))
+            }
+        elif "3 hojas (X-O-X" in self.diseno:
+            zoclo_corr = (self.ancho - self.desc_3_hojas) / 3
+            zoclo_fija = zoclo_corr + 0.013 
+            cerco_fija = self.alto - 0.005
+            cerco_corr = self.alto - 0.046
+            return {
+                "fija_centro": (round(cerco_fija, 3), round(zoclo_fija, 3)),
+                "corr_izq": (round(cerco_corr, 3), round(zoclo_corr, 3)),
+                "corr_der": (round(cerco_corr, 3), round(zoclo_corr, 3))
+            }
+        elif "3 hojas (O-X-O" in self.diseno:
+            zoclo_corr = (self.ancho - self.desc_3_hojas) / 3
+            zoclo_fija = zoclo_corr + 0.013 
+            cerco_fija = self.alto - 0.005
+            cerco_corr = self.alto - 0.046
+            return {
+                "corr_centro": (round(cerco_corr, 3), round(zoclo_corr, 3)),
+                "fija_izq": (round(cerco_fija, 3), round(zoclo_fija, 3)),
+                "fija_der": (round(cerco_fija, 3), round(zoclo_fija, 3))
+            }
+        elif "2 hojas (X-X)" in self.diseno:
+            alto_corr, ancho_corr = self.calcular_hoja_corrediza()
+            return {
+                "corr_izq": (round(alto_corr, 3), round(ancho_corr, 3)),
+                "corr_der": (round(alto_corr, 3), round(ancho_corr, 3))
+            }
+        else: # 2 hojas (O-X) default
+            alto_fija, ancho_fija = self.calcular_hoja_fija()
+            alto_corr, ancho_corr = self.calcular_hoja_corrediza()
+            return {
+                "fija": (round(alto_fija, 3), round(ancho_fija, 3)),
+                "corrediza": (round(alto_corr, 3), round(ancho_corr, 3))
+            }
+
+    def calcular_vidrio(self, corte_alto_hoja, corte_ancho_hoja):
+        holgura = 0.015
+        ancho_vidrio_real = corte_ancho_hoja + holgura
+        alto_vidrio_real = corte_alto_hoja - (self.perfil_zoclo + self.perfil_cabezal) + holgura
+        area_por_vidrio = alto_vidrio_real * ancho_vidrio_real
+        return round(ancho_vidrio_real, 3), round(alto_vidrio_real, 3), round(area_por_vidrio, 3)
+
+    def calcular_intermedios_aluminio(self, alto_hoja, ancho_hoja, es_gigante=False):
+        if not self.cuadricula: return {"verticales": [], "horizontales": []}
+        largo_vertical = (alto_hoja - self.perfil_zoclo - self.perfil_cabezal) + (0.005 * 2)
+        largo_horizontal = ancho_hoja + (0.005 * 2)
+        if not es_gigante:
+            num_vert = self.cols_hoja - 1
+            num_horz = self.filas_hoja - 1
+            return {"verticales": [round(largo_vertical, 3)] * num_vert, "horizontales": [round(largo_horizontal, 3)] * num_horz}
+        else:
+            num_vert = (self.cols_hoja * 2) - 1
+            num_horz = self.filas_hoja - 1
+            return {"verticales": [round(largo_vertical, 3)] * num_vert, "horizontales": [round(largo_horizontal, 3)] * num_horz}
+
+class FijoNacional:
+    def __init__(self, ancho, alto, linea_aluminio):
+        self.ancho = ancho
+        self.alto = alto
+        self.linea_aluminio = linea_aluminio
+        
+        if self.linea_aluminio == "3 pulgadas":
+            self.desc_bolsa_horizontal = 0.005 
+            self.desc_bolsa_vertical = 0.045   
+            self.desc_vidrio = 0.021           
+        else: 
+            self.desc_bolsa_horizontal = 0.005
+            self.desc_bolsa_vertical = 0.035
+            self.desc_vidrio = 0.015
+
+    def calcular_cortes(self):
+        bolsa_horizontal = self.ancho - self.desc_bolsa_horizontal
+        bolsa_vertical = self.alto - self.desc_bolsa_vertical
+        return round(bolsa_horizontal, 3), round(bolsa_vertical, 3)
+
+    def calcular_vidrio(self):
+        ancho_vidrio = self.ancho - self.desc_vidrio
+        alto_vidrio = self.alto - self.desc_vidrio
+        area = ancho_vidrio * alto_vidrio
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(area, 3)
+
+class Puerta:
+    def __init__(self, ancho, alto, detalle, color):
+        self.ancho = ancho 
+        self.alto = alto 
+        self.detalle = detalle
+        self.color = color
+
+    def calcular_cortes_marco(self):
+        return (self.ancho * 100 - 0.2) / 100.0, (self.alto * 100 - 1.8) / 100.0
+
+    def calcular_cortes_hoja(self):
+        return (self.alto * 100 - 3.1) / 100.0, (self.ancho * 100 - 13.6) / 100.0
+
+    def calcular_relleno(self):
+        cerco_hoja = (self.alto * 100) - 3.1
+        horizontal_hoja = (self.ancho * 100) - 13.6
+        alto_corte_relleno = ((cerco_hoja - 15.0 - 3.5) / 2.0) + 1.5
+        ancho_corte_relleno = horizontal_hoja + 1.5
+        cantidad_duelas = math.ceil(alto_corte_relleno / 12.5)
+        return ancho_corte_relleno / 100.0, alto_corte_relleno / 100.0, cantidad_duelas
+
+class FijoEurovent:
+    def __init__(self, ancho, alto, serie="Serie 35"):
+        self.ancho = ancho
+        self.alto = alto
+        self.serie = serie
+    def calcular_cortes(self):
+        return round(self.alto, 3), round(self.ancho - 0.090, 3)
+    def calcular_vidrio(self):
+        return round(self.ancho - 0.075, 3), round(self.alto - 0.075, 3), round((self.ancho - 0.075) * (self.alto - 0.075), 3)
+
+class FijoEuroventS60:
+    def __init__(self, ancho, alto):
+        self.ancho = ancho
+        self.alto = alto
+    def calcular_cortes(self):
+        return round(self.alto, 3), round(self.ancho - 0.045, 3)
+    def calcular_vidrio(self):
+        return round(self.ancho - 0.057, 3), round(self.alto - 0.057, 3), round((self.ancho - 0.057) * (self.alto - 0.057), 3)
+
+class FijoEuroventS140:
+    def __init__(self, ancho, alto):
+        self.ancho = ancho
+        self.alto = alto
+    def calcular_cortes(self):
+        return round(self.alto, 3), round(self.ancho - 0.102, 3)
+    def calcular_vidrio(self):
+        return round(self.ancho - 0.085, 3), round(self.alto - 0.085, 3), round((self.ancho - 0.085) * (self.alto - 0.085), 3)
+
+class VentanaEuroventS50:
+    def __init__(self, ancho, alto, diseno="2 hojas (Fija/Corrediza | O-X)"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+    def calcular_cortes_marco(self):
+        return round(self.ancho - 0.020, 3), round(self.alto, 3)
+    def calcular_hojas(self):
+        cerco_traslape = self.alto - 0.066 
+        if "3 hojas" in self.diseno: zoclo = (self.ancho / 3.0) + 0.010 
+        elif "4 hojas" in self.diseno: zoclo = (self.ancho / 4.0) + 0.015
+        else: zoclo = (self.ancho / 2.0) - 0.002 
+        return round(cerco_traslape, 3), round(zoclo, 3)
+    def calcular_vidrio(self):
+        alto_vidrio = self.alto - 0.160 
+        if "3 hojas" in self.diseno: ancho_vidrio = (self.ancho / 3.0) - 0.070
+        elif "4 hojas" in self.diseno: ancho_vidrio = (self.ancho / 4.0) - 0.075
+        else: ancho_vidrio = (self.ancho / 2.0) - 0.084 
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(ancho_vidrio * alto_vidrio, 3)
+
+class VentanaEuroventS60:
+    def __init__(self, ancho, alto, diseno="2 hojas (Fija/Corrediza | O-X)"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+    def calcular_cortes_marco(self):
+        return round(self.ancho, 3), round(self.alto, 3)
+    def calcular_hojas(self):
+        cerco_traslape = self.alto - 0.057 
+        if "3 hojas" in self.diseno: zoclo = (self.ancho / 3.0) + 0.012
+        elif "4 hojas" in self.diseno: zoclo = (self.ancho / 4.0) + 0.015
+        else: zoclo = (self.ancho / 2.0) 
+        return round(cerco_traslape, 3), round(zoclo, 3)
+    def calcular_vidrio(self):
+        alto_vidrio = self.alto - 0.138 
+        if "3 hojas" in self.diseno: ancho_vidrio = (self.ancho / 3.0) - 0.065
+        elif "4 hojas" in self.diseno: ancho_vidrio = (self.ancho / 4.0) - 0.072
+        else: ancho_vidrio = (self.ancho / 2.0) - 0.082 
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(ancho_vidrio * alto_vidrio, 3)
+
+class VentanaEuroventS70:
+    def __init__(self, ancho, alto, diseno="2 hojas (Fija/Corrediza | O-X)"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+    def calcular_cortes_marco(self):
+        return round(self.ancho - 0.026, 3), round(self.alto, 3)
+    def calcular_hojas(self):
+        cerco_traslape = self.alto - 0.066 
+        if "3 hojas" in self.diseno: zoclo = (self.ancho / 3.0) + 0.015
+        elif "4 hojas" in self.diseno: zoclo = (self.ancho / 4.0) + 0.018
+        else: zoclo = (self.ancho / 2.0) 
+        return round(cerco_traslape, 3), round(zoclo, 3)
+    def calcular_vidrio(self):
+        alto_vidrio = self.alto - 0.191 
+        if "3 hojas" in self.diseno: ancho_vidrio = (self.ancho / 3.0) - 0.085
+        elif "4 hojas" in self.diseno: ancho_vidrio = (self.ancho / 4.0) - 0.090
+        else: ancho_vidrio = (self.ancho / 2.0) - 0.104 
+        return round(ancho_vidrio, 3), round(alto_vidrio, 3), round(ancho_vidrio * alto_vidrio, 3)
+
+class VentanaProyeccionBatienteEuroventS35:
+    def __init__(self, ancho, alto, diseno="1 hoja (Proyección)", mosquitero=False):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+        self.mosquitero = mosquitero
+    def calcular_cortes_marco(self):
+        return round(self.ancho, 3), round(self.alto, 3)
+    def calcular_hojas(self):
+        if "2 hojas" in self.diseno: return round(self.alto - 0.040, 3), round((self.ancho / 2.0) - 0.038, 3), round(self.alto - 0.048, 3)
+        else: return round(self.alto - 0.048, 3), round(self.ancho - 0.048, 3), 0.0
+    def calcular_vidrio(self):
+        if "2 hojas" in self.diseno:
+            ancho_v = (self.ancho / 2.0) - 0.103 
+            alto_v = self.alto - 0.114            
+        else:
+            ancho_v = self.ancho - 0.115          
+            alto_v = self.alto - 0.115            
+        return round(ancho_v, 3), round(alto_v, 3), round(ancho_v * alto_v, 3)
+    def calcular_mosquitero(self):
+        if not self.mosquitero: return 0.0, 0.0
+        if "2 hojas" in self.diseno: return round(self.alto - 0.068, 3), round((self.ancho / 2.0) - 0.059, 3)
+        else: return round(self.alto - 0.069, 3), round(self.ancho - 0.069, 3)
+
+class PuertaComercialEuroventS50:
+    def __init__(self, ancho, alto, diseno="1 hoja"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+    def calcular_cortes_marco(self): return round(self.ancho - 0.002, 3), round(self.alto - 0.018, 3)
+    def calcular_hojas(self):
+        if "2 hojas" in self.diseno: return round(self.alto - 0.044, 3), round((self.ancho / 2.0) - 0.038, 3)
+        else: return round(self.alto - 0.044, 3), round(self.ancho - 0.051, 3)
+    def calcular_vidrio(self):
+        if "2 hojas" in self.diseno: return round((self.ancho / 2.0) - 0.120, 3), round(self.alto - 0.180, 3), 0.0
+        else: return round(self.ancho - 0.171, 3), round(self.alto - 0.171, 3), 0.0
+
+class PuertaResidencialEuroventS50:
+    def __init__(self, ancho, alto, diseno="1 hoja"):
+        self.ancho = ancho
+        self.alto = alto
+        self.diseno = diseno
+    def calcular_cortes_marco(self): return round(self.ancho - 0.002, 3), round(self.alto - 0.018, 3)
+    def calcular_hojas(self):
+        if "2 hojas" in self.diseno: return round(self.alto - 0.044, 3), round((self.ancho / 2.0) - 0.165, 3)
+        else: return round(self.alto - 0.044, 3), round(self.ancho - 0.268, 3)
+    def calcular_vidrio(self):
+        if "2 hojas" in self.diseno: return round((self.ancho / 2.0) - 0.154, 3), round(self.alto - 0.224, 3), 0.0
+        else: return round(self.ancho - 0.349, 3), round(self.alto - 0.349, 3), 0.0
+
 
 # ==========================================
 # FUNCIONES GLOBALES DE OPTIMIZACIÓN
@@ -300,14 +624,14 @@ if is_editing:
     sistema_seleccionado = pieza_actual.get('sistema', "Línea Nacional (Estándar)")
     def_tipo, def_detalle = pieza_actual['tipo'], pieza_actual['detalle']
     def_ancho, def_alto = float(pieza_actual['ancho'] * 100), float(pieza_actual['alto'] * 100)
-    def_diseno = pieza_actual.get('diseno', "2 hojas")
+    def_diseno = pieza_actual.get('diseno', "2 hojas (O-X)")
     def_cuadricula = pieza_actual.get('cuadricula', False)
     def_mosquitero = pieza_actual.get('mosquitero', False)
 else:
     def_tipo = "Ventana Corrediza" if sistema_seleccionado == "Línea Nacional (Estándar)" else "Ventana Corrediza S50"
     def_detalle = "3 pulgadas" if sistema_seleccionado == "Línea Nacional (Estándar)" else "Eurovent S50"
     def_ancho, def_alto = 100.0, 210.0
-    def_diseno, def_cuadricula, def_mosquitero = "2 hojas (Fija/Corrediza | O-X)", False, False
+    def_diseno, def_cuadricula, def_mosquitero = "2 hojas (O-X)", False, False
 
 col_tipo, col_detalle = st.columns(2)
 
@@ -343,7 +667,7 @@ if tipo_pieza in ["Ventana Corrediza", "Ventana Corrediza S50", "Ventana Corredi
     col_diseno, col_cuadricula = st.columns(2)
     
     if sistema_seleccionado == "Línea Nacional (Estándar)":
-        opciones_diseno = ["2 hojas", "Fijo Gigante Centro", "3 hojas (1 Fija Ext, 2 Corr)"]
+        opciones_diseno = ["2 hojas (O-X)", "2 hojas (X-X)", "3 hojas (X-O-X | Fijo Centro)", "3 hojas (O-X-O | Corrediza Centro)", "Fijo Gigante Centro"]
     else:
         opciones_diseno = ["2 hojas (Fija/Corrediza | O-X)", "2 hojas (Doble Corrediza | X-X)", "3 hojas (X-O-X)", "4 hojas (O-X-X-O)"] 
         
@@ -602,21 +926,15 @@ with col_prov1:
                         elif "3 hojas" in d_str: 
                             num_hojas = 3
                             if es_activo: totales["jaladera"] += 2; totales["carretilla"] += 4
-                        elif "X-X" in d_str: 
-                            num_hojas = 2
-                            if es_activo: totales["jaladera"] += 2; totales["carretilla"] += 4
                         else: 
                             num_hojas = 2
                             if es_activo: totales["jaladera"] += 1; totales["carretilla"] += 2
                             
                         if es_activo: totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100 
                         
-                        if p['tipo'] == "Ventana Corrediza S50":
-                            v = VentanaEuroventS50(p['ancho'], p['alto'], diseno=d_str)
-                        elif p['tipo'] == "Ventana Corrediza S60":
-                            v = VentanaEuroventS60(p['ancho'], p['alto'], diseno=d_str)
-                        else:
-                            v = VentanaEuroventS70(p['ancho'], p['alto'], diseno=d_str)
+                        if p['tipo'] == "Ventana Corrediza S50": v = VentanaEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                        elif p['tipo'] == "Ventana Corrediza S60": v = VentanaEuroventS60(p['ancho'], p['alto'], diseno=d_str)
+                        else: v = VentanaEuroventS70(p['ancho'], p['alto'], diseno=d_str)
                             
                         riel, jamba = v.calcular_cortes_marco()
                         cerco, zoclo = v.calcular_hojas()
@@ -632,13 +950,11 @@ with col_prov1:
                     
                     elif "Fijo" in p['tipo']:
                         if es_activo: totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100
-                        
                         if p['tipo'] == "Fijo S60": v = FijoEuroventS60(p['ancho'], p['alto'])
                         elif p['tipo'] == "Fijo S140": v = FijoEuroventS140(p['ancho'], p['alto'])
                         else: v = FijoEurovent(p['ancho'], p['alto'])
                         
                         bolsa_v, bolsa_h = v.calcular_cortes()
-                        
                         agregar_cortes_prov(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"L(Fijo)-P{num_pieza}", es_activo)
                         agregar_cortes_prov(cortes_riel, [round(bolsa_h*100, 1)], f"C(Fijo1)-P{num_pieza}", es_activo)
                         agregar_cortes_prov(cortes_zoclo, [round(bolsa_h*100, 1)], f"C(Fijo2)-P{num_pieza}", es_activo)
@@ -671,15 +987,12 @@ with col_prov1:
                     elif p['tipo'] in ["Puerta Comercial S50", "Puerta Residencial S50"]:
                         d_str = p.get('diseno', "1 hoja")
                         hojas_totales = 2 if "2 hojas" in d_str else 1
-                        
                         if es_activo:
                             totales["jaladera"] += 1 
                             totales["vinil"] += ((p['ancho'] + p['alto']) * 2) * 100 * hojas_totales
-                            
-                        if p['tipo'] == "Puerta Comercial S50":
-                            v = PuertaComercialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
-                        else:
-                            v = PuertaResidencialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                        
+                        if p['tipo'] == "Puerta Comercial S50": v = PuertaComercialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                        else: v = PuertaResidencialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
                             
                         cm_w, cm_h = v.calcular_cortes_marco()
                         c_alto, c_ancho = v.calcular_hojas()
@@ -705,11 +1018,11 @@ with col_prov1:
                     todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
 
                 elif p['tipo'] == "Ventana Corrediza":
-                    diseno = p.get('diseno', "2 hojas")
+                    diseno = p.get('diseno', "2 hojas (O-X)")
                     cuadricula = p.get('cuadricula', False)
                     t_cuad = p.get('tipo_cuadricula', "2x3")
                     if es_activo:
-                        if diseno == "Fijo Gigante Centro" or "3 hojas" in diseno:
+                        if "Fijo Gigante" in diseno or "3 hojas" in diseno:
                             totales["jaladera"] += 2; totales["carretilla"] += 4
                         else:
                             totales["jaladera"] += 1; totales["carretilla"] += 2
@@ -721,8 +1034,7 @@ with col_prov1:
                     agregar_cortes_prov(cortes_chambrana, [round(a_m*100, 1)], f"C-P{num_pieza}", es_activo)
                     agregar_cortes_prov(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1)], f"L-P{num_pieza}", es_activo)
                     
-                    if "3 hojas" in diseno: agregar_cortes_prov(cortes_riel, [round(a_m*100, 1), round(a_m*100, 1)], f"P{num_pieza}", es_activo)
-                    else: agregar_cortes_prov(cortes_riel, [round(a_m*100, 1)], f"P{num_pieza}", es_activo)
+                    agregar_cortes_prov(cortes_riel, [round(a_m*100, 1)], f"P{num_pieza}", es_activo)
                     
                     def prov_hoja(alto_h, ancho_h, es_gigante):
                         agregar_cortes_prov(cortes_cabezal, [round(ancho_h*100, 1)], f"P{num_pieza}", es_activo)
@@ -754,17 +1066,24 @@ with col_prov1:
                             a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
                             todos_los_vidrios_prov.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
                             
-                    if "2 hojas" in diseno:
+                    if "2 hojas (O-X)" in diseno:
                         prov_hoja(hojas["fija"][0], hojas["fija"][1], False)
                         prov_hoja(hojas["corrediza"][0], hojas["corrediza"][1], False)
-                    elif diseno == "Fijo Gigante Centro":
+                    elif "2 hojas (X-X)" in diseno:
+                        prov_hoja(hojas["corr_izq"][0], hojas["corr_izq"][1], False)
+                        prov_hoja(hojas["corr_der"][0], hojas["corr_der"][1], False)
+                    elif "3 hojas (X-O-X" in diseno:
+                        prov_hoja(hojas["fija_centro"][0], hojas["fija_centro"][1], False)
+                        prov_hoja(hojas["corr_izq"][0], hojas["corr_izq"][1], False)
+                        prov_hoja(hojas["corr_der"][0], hojas["corr_der"][1], False)
+                    elif "3 hojas (O-X-O" in diseno:
+                        prov_hoja(hojas["corr_centro"][0], hojas["corr_centro"][1], False)
+                        prov_hoja(hojas["fija_izq"][0], hojas["fija_izq"][1], False)
+                        prov_hoja(hojas["fija_der"][0], hojas["fija_der"][1], False)
+                    elif "Fijo Gigante Centro" in diseno:
                         prov_hoja(hojas["fija_gigante"][0], hojas["fija_gigante"][1], True)
                         prov_hoja(hojas["corrediza_izq"][0], hojas["corrediza_izq"][1], False)
                         prov_hoja(hojas["corrediza_der"][0], hojas["corrediza_der"][1], False)
-                    elif "3 hojas" in diseno:
-                        prov_hoja(hojas["fija_ext"][0], hojas["fija_ext"][1], False)
-                        prov_hoja(hojas["corr_normal"][0], hojas["corr_normal"][1], False)
-                        prov_hoja(hojas["corr_doble"][0], hojas["corr_doble"][1], False)
                         
                 elif p['tipo'] == "Puerta":
                     puerta = Puerta(p['ancho'], p['alto'], p['detalle'], "Blanco")
@@ -880,7 +1199,6 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
             num_pieza = i + 1  
             sys = p.get('sistema', "Línea Nacional (Estándar)")
 
-            # ------- LÓGICA EUROVENT PREMIUM -------
             if sys == "Línea Premium (Eurovent)":
                 if p['tipo'] in ["Ventana Corrediza S50", "Ventana Corrediza S60", "Ventana Corrediza S70"]:
                     d_str = p.get('diseno', "2 hojas (Fija/Corrediza | O-X)")
@@ -888,12 +1206,9 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     elif "4 hojas" in d_str: num_hojas = 4
                     else: num_hojas = 2
                     
-                    if p['tipo'] == "Ventana Corrediza S50":
-                        v = VentanaEuroventS50(p['ancho'], p['alto'], diseno=d_str)
-                    elif p['tipo'] == "Ventana Corrediza S60":
-                        v = VentanaEuroventS60(p['ancho'], p['alto'], diseno=d_str)
-                    else:
-                        v = VentanaEuroventS70(p['ancho'], p['alto'], diseno=d_str)
+                    if p['tipo'] == "Ventana Corrediza S50": v = VentanaEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                    elif p['tipo'] == "Ventana Corrediza S60": v = VentanaEuroventS60(p['ancho'], p['alto'], diseno=d_str)
+                    else: v = VentanaEuroventS70(p['ancho'], p['alto'], diseno=d_str)
                         
                     riel, jamba = v.calcular_cortes_marco()
                     cerco, zoclo = v.calcular_hojas()
@@ -905,14 +1220,12 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     agregar_cortes_taller(cortes_zoclo, [round(zoclo*100, 1)]*(num_hojas*2), f"Zoclo-P{num_pieza}", es_activo)
                     
                     a_v, alt_v, _ = v.calcular_vidrio()
-                    for _ in range(num_hojas):
-                        todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+                    for _ in range(num_hojas): todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
                 
                 elif "Fijo" in p['tipo']:
                     if p['tipo'] == "Fijo S60": v = FijoEuroventS60(p['ancho'], p['alto'])
                     elif p['tipo'] == "Fijo S140": v = FijoEuroventS140(p['ancho'], p['alto'])
                     else: v = FijoEurovent(p['ancho'], p['alto'])
-                    
                     bolsa_v, bolsa_h = v.calcular_cortes()
                     
                     agregar_cortes_taller(cortes_chambrana, [round(bolsa_v*100, 1), round(bolsa_v*100, 1)], f"L(Fijo)-P{num_pieza}", es_activo)
@@ -935,24 +1248,19 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     agregar_cortes_taller(cortes_cabezal, [round(c_ancho*100, 1)]*(2*hojas_totales), f"Marco(H)-P{num_pieza}", es_activo)
                     
                     if inter > 0: agregar_cortes_taller(cortes_intermedio, [round(inter*100, 1)], f"Interm-P{num_pieza}", es_activo)
-                    
                     if p.get('mosquitero', False):
                         num_mosq = 2 if "2 hojas" in p.get('diseno', '') else 1
                         agregar_cortes_taller(cortes_mosquitero, [round(m_alto*100, 1)]*(2*num_mosq) + [round(m_ancho*100, 1)]*(2*num_mosq), f"Mosq-P{num_pieza}", es_activo)
                         
                     a_v, alt_v, _ = v.calcular_vidrio()
-                    for _ in range(hojas_totales):
-                        todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
+                    for _ in range(hojas_totales): todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
 
                 elif p['tipo'] in ["Puerta Comercial S50", "Puerta Residencial S50"]:
                     d_str = p.get('diseno', "1 hoja")
                     hojas_totales = 2 if "2 hojas" in d_str else 1
+                    if p['tipo'] == "Puerta Comercial S50": v = PuertaComercialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
+                    else: v = PuertaResidencialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
                         
-                    if p['tipo'] == "Puerta Comercial S50":
-                        v = PuertaComercialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
-                    else:
-                        v = PuertaResidencialEuroventS50(p['ancho'], p['alto'], diseno=d_str)
-                            
                     cm_w, cm_h = v.calcular_cortes_marco()
                     c_alto, c_ancho = v.calcular_hojas()
                         
@@ -964,7 +1272,6 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     a_v, alt_v, _ = v.calcular_vidrio()
                     for _ in range(hojas_totales): todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
 
-            # ------- LÓGICA NACIONAL ESTÁNDAR -------
             elif p['tipo'] == "Fijo":
                 v = FijoNacional(p['ancho'], p['alto'], p['detalle'])
                 bolsa_h, bolsa_v = v.calcular_cortes()
@@ -976,7 +1283,7 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                 todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": f"P{num_pieza}", "activo": es_activo})
 
             elif p['tipo'] == "Ventana Corrediza":
-                diseno = p.get('diseno', "2 hojas")
+                diseno = p.get('diseno', "2 hojas (O-X)")
                 cuadricula = p.get('cuadricula', False)
                 t_cuad = p.get('tipo_cuadricula', "2x3")
                 
@@ -986,25 +1293,24 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                 
                 agregar_cortes_taller(cortes_chambrana, [round(a_m*100, 1)], f"C-P{num_pieza}", es_activo)
                 agregar_cortes_taller(cortes_chambrana, [round(alt_l*100, 1), round(alt_l*100, 1)], f"L-P{num_pieza}", es_activo)
-                agregar_cortes_taller(cortes_riel, [round(a_m*100, 1)] * (2 if "3 hojas" in diseno else 1), f"P{num_pieza}", es_activo)
+                
+                # Independientemente de si es 2 o 3 hojas X-O-X, lleva 1 riel doble vía
+                agregar_cortes_taller(cortes_riel, [round(a_m*100, 1)], f"P{num_pieza}", es_activo)
                 
                 def armar_hoja_taller(lbl, h_dim, es_gigante=False):
                     alto_h, ancho_h = h_dim[0], h_dim[1]
                     agregar_cortes_taller(cortes_cabezal, [round(ancho_h*100, 1)], lbl, es_activo)
                     agregar_cortes_taller(cortes_zoclo, [round(ancho_h*100, 1)], lbl, es_activo)
                     
-                    if es_gigante:
-                        agregar_cortes_taller(cortes_cerco, [round(alto_h*100, 1)] * 2, lbl, es_activo)
+                    if es_gigante: agregar_cortes_taller(cortes_cerco, [round(alto_h*100, 1)] * 2, lbl, es_activo)
                     else:
                         agregar_cortes_taller(cortes_cerco, [round(alto_h*100, 1)], lbl, es_activo)
                         agregar_cortes_taller(cortes_traslape, [round(alto_h*100, 1)], lbl, es_activo)
                     
                     if cuadricula:
                         ints = v.calcular_intermedios_aluminio(alto_h, ancho_h, es_gigante)
-                        if ints["verticales"]:
-                            agregar_cortes_taller(cortes_intermedio, [round(x*100, 1) for x in ints["verticales"]], f"Vert-{lbl}", es_activo)
-                        if ints["horizontales"]:
-                            agregar_cortes_taller(cortes_intermedio, [round(x*100, 1) for x in ints["horizontales"]], f"Horz-{lbl}", es_activo)
+                        if ints["verticales"]: agregar_cortes_taller(cortes_intermedio, [round(x*100, 1) for x in ints["verticales"]], f"Vert-{lbl}", es_activo)
+                        if ints["horizontales"]: agregar_cortes_taller(cortes_intermedio, [round(x*100, 1) for x in ints["horizontales"]], f"Horz-{lbl}", es_activo)
                         
                         alto_int = alto_h - v.perfil_cabezal - v.perfil_zoclo
                         ancho_int = ancho_h - (v.perfil_cerco_traslape * 2)
@@ -1013,23 +1319,29 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                         alto_v = ((alto_int - (filas - 1) * v.intermedio_frente) / filas) + v.holgura_vidrio
                         ancho_v = ((ancho_int - (cols - 1) * v.intermedio_frente) / cols) + v.holgura_vidrio
                         
-                        for _ in range(filas * cols):
-                            todos_los_vidrios_taller.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": lbl, "activo": es_activo})
+                        for _ in range(filas * cols): todos_los_vidrios_taller.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": lbl, "activo": es_activo})
                     else:
                         a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
                         todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl, "activo": es_activo})
 
-                if "2 hojas" in diseno:
+                if "2 hojas (O-X)" in diseno:
                     armar_hoja_taller(f"Fija-P{num_pieza}", hojas["fija"])
                     armar_hoja_taller(f"Corr-P{num_pieza}", hojas["corrediza"])
-                elif diseno == "Fijo Gigante Centro":
+                elif "2 hojas (X-X)" in diseno:
+                    armar_hoja_taller(f"CorIzq-P{num_pieza}", hojas["corr_izq"])
+                    armar_hoja_taller(f"CorDer-P{num_pieza}", hojas["corr_der"])
+                elif "3 hojas (X-O-X" in diseno:
+                    armar_hoja_taller(f"FijCen-P{num_pieza}", hojas["fija_centro"])
+                    armar_hoja_taller(f"CorIzq-P{num_pieza}", hojas["corr_izq"])
+                    armar_hoja_taller(f"CorDer-P{num_pieza}", hojas["corr_der"])
+                elif "3 hojas (O-X-O" in diseno:
+                    armar_hoja_taller(f"CorCen-P{num_pieza}", hojas["corr_centro"])
+                    armar_hoja_taller(f"FijIzq-P{num_pieza}", hojas["fija_izq"])
+                    armar_hoja_taller(f"FijDer-P{num_pieza}", hojas["fija_der"])
+                elif "Fijo Gigante Centro" in diseno:
                     armar_hoja_taller(f"FijGig-P{num_pieza}", hojas["fija_gigante"], True)
                     armar_hoja_taller(f"CorIzq-P{num_pieza}", hojas["corrediza_izq"])
                     armar_hoja_taller(f"CorDer-P{num_pieza}", hojas["corrediza_der"])
-                elif "3 hojas" in diseno:
-                    armar_hoja_taller(f"FijExt-P{num_pieza}", hojas["fija_ext"])
-                    armar_hoja_taller(f"CorNrm-P{num_pieza}", hojas["corr_normal"])
-                    armar_hoja_taller(f"CorDbl-P{num_pieza}", hojas["corr_doble"])
 
         pdf = FPDF()
         pdf.add_page()
@@ -1097,9 +1409,16 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                 pdf.set_font("Arial", 'B', 10)
                 pdf.cell(0, 6, "RECORTES DEL TALLER:", ln=True)
                 pdf.set_font("Arial", '', 10)
+                
+                # Agrupar recortes del taller
+                rescatados_agrupados = []
                 for r in vidrios_rescatados:
                     if r["pieza"].get('activo', True) or not usar_fases:
-                        pdf.cell(0, 6, f"  - Del retazo {r['pedazo']['original']}: Cortar {r['pieza']['w']} x {r['pieza']['h']} cm ({r['pieza']['etiqueta']})", ln=True)
+                        rescatados_agrupados.append((r['pedazo']['original'], r['pieza']['w'], r['pieza']['h'], r['pieza']['etiqueta']))
+                        
+                conteo_resc = Counter(rescatados_agrupados)
+                for (ped_orig, w, h, etiqueta), count in conteo_resc.items():
+                    pdf.cell(0, 6, f"  - Del retazo(s) {ped_orig}: Cortar {w} x {h} cm ({etiqueta})  x{count}", ln=True)
                 pdf.ln(3)
 
             if hojas_vidrio:
@@ -1111,10 +1430,33 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                     pdf.set_font("Arial", 'B', 10)
                     pdf.cell(0, 6, f" >> HOJA {i+1}:", ln=True)
                     pdf.set_font("Arial", '', 10)
+                    
+                    # Agrupar piezas idénticas
+                    piezas_agrupadas = []
                     for j, col in enumerate(h['columnas']):
                         for p in col['piezas']:
                             txt_act = " [CORTA HOY]" if usar_fases and p.get('activo') else " [GUARDA]" if usar_fases else ""
-                            pdf.cell(0, 6, f"      [ ] {p['w']} x {p['h']} cm   (Mrc: {p['etiqueta']}){txt_act}", ln=True)
+                            piezas_agrupadas.append((p['w'], p['h'], p['etiqueta'], txt_act))
+                    
+                    conteo = Counter(piezas_agrupadas)
+                    
+                    # Imprimir en doble columna para ahorrar papel
+                    col_act = 0
+                    x_izq = 15
+                    x_der = 105
+                    for (w, h, etiqueta, txt_act), count in conteo.items():
+                        texto_pieza = f"[ ] {w} x {h} cm (Mrc: {etiqueta}) x{count}{txt_act}"
+                        if col_act == 0:
+                            pdf.set_x(x_izq)
+                            pdf.cell(85, 6, texto_pieza, ln=False)
+                            col_act = 1
+                        else:
+                            pdf.set_x(x_der)
+                            pdf.cell(85, 6, texto_pieza, ln=True)
+                            col_act = 0
+                            
+                    if col_act == 1:
+                        pdf.ln(6)
                     pdf.ln(2)
 
         pdf_bytes = pdf.output(dest='S').encode('latin-1')
