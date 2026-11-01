@@ -1541,7 +1541,7 @@ if st.button("✂️ Generar Guía de Cortes para Taller (PDF)", type="primary",
                         
                         for _ in range(filas * cols): 
                             todos_los_vidrios_taller.append({"medida": f"{round(ancho_v*100, 1)} x {round(alto_v*100, 1)}", "etiqueta": lbl, "activo": es_activo})
-                else:
+            else:
                     a_v, alt_v, _ = v.calcular_vidrio(alto_h, ancho_h)
                     todos_los_vidrios_taller.append({"medida": f"{round(a_v*100, 1)} x {round(alt_v*100, 1)}", "etiqueta": lbl, "activo": es_activo})
 
