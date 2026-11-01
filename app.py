@@ -34,7 +34,7 @@ if 'nombre_cliente' not in st.session_state:
     st.session_state.nombre_cliente = ""
 
 # =======================================================
-# CLASES DE LÓGICA MATEMÁTICA (INTEGRADAS Y FORMATEADAS)
+# CLASES DE LÓGICA MATEMÁTICA
 # =======================================================
 class Ventana:
     def __init__(self, ancho, alto, linea_aluminio, color, division_horizontal=False, diseno="2 hojas (O-X)", cuadricula=False, tipo_cuadricula="2x3"):
@@ -524,7 +524,8 @@ def optimizador_vidrio(vidrios_list, pedaceria_str):
         
     piezas_rescatadas, pendientes_exactas, pendientes_reducidas = [], [], []
     for i in range(len(piezas_exactas)):
-        p_ex, p_red = piezas_exactas[i], piezas_reducidas[i]
+        p_ex = piezas_exactas[i]
+        p_red = piezas_reducidas[i]
         colocado = False
         for ped in pedaceria:
             if not ped["usado"]:
@@ -711,8 +712,12 @@ if is_editing:
     def_cuadricula = pieza_actual.get('cuadricula', False)
     def_mosquitero = pieza_actual.get('mosquitero', False)
 else:
-    def_tipo = "Ventana Corrediza" if sistema_seleccionado == "Línea Nacional (Estándar)" else "Ventana Corrediza S50"
-    def_detalle = "3 pulgadas" if sistema_seleccionado == "Línea Nacional (Estándar)" else "Eurovent S50"
+    if sistema_seleccionado == "Línea Nacional (Estándar)":
+        def_tipo = "Ventana Corrediza"
+        def_detalle = "3 pulgadas"
+    else:
+        def_tipo = "Ventana Corrediza S50"
+        def_detalle = "Eurovent S50"
     def_ancho = 100.0
     def_alto = 210.0
     def_diseno = "2 hojas (O-X)"
@@ -884,7 +889,10 @@ with st.expander("📝 Piezas en el Proyecto", expanded=False):
             col_text, col_status, col_edit, col_del = st.columns([0.70, 0.15, 0.075, 0.075])
             with col_text:
                 txt_sys = "⭐️ Eurovent" if pieza.get('sistema') == "Línea Premium (Eurovent)" else "Nacional"
-                txt_dis = f" - {pieza.get('diseno', '')}" if "Fijo" not in pieza['tipo'] else ""
+                if "Fijo" not in pieza['tipo']:
+                    txt_dis = f" - {pieza.get('diseno', '')}"
+                else:
+                    txt_dis = ""
                 txt_mosq = " (Mosquitero)" if pieza.get('mosquitero', False) else ""
                 
                 if pieza.get('entregada', False):
@@ -908,7 +916,7 @@ with st.expander("📝 Piezas en el Proyecto", expanded=False):
                     st.rerun()
 
 # ==========================================
-# SECCIÓN 3: FINANZAS Y COTIZACIÓN AL CLIENTE (SÓLO ADMIN)
+# SECCIÓN 3: FINANZAS Y COTIZACIÓN AL CLIENTE
 # ==========================================
 if st.session_state.get('admin', False):
     st.write("---")
@@ -1001,7 +1009,7 @@ if st.session_state.get('admin', False):
             st.error("⚠️ Error generando PDF.")
 
 # ==========================================
-# SECCIÓN 4: PRODUCCIÓN DE TALLER (ACCESIBLE)
+# SECCIÓN 4: PRODUCCIÓN DE TALLER
 # ==========================================
 st.write("---")
 st.subheader("🚧 Producción de Taller")
@@ -1029,7 +1037,8 @@ with col_prov1:
             import base64
             
             totales = {"jaladera": 0, "carretilla": 0, "vinil": 0.0}
-            cortes_chambrana, cortes_riel, cortes_cerco, cortes_traslape, cortes_cabezal, cortes_zoclo, cortes_intermedio, cortes_mosquitero = [], [], [], [], [], [], [], []
+            cortes_chambrana, cortes_riel, cortes_cerco, cortes_traslape = [], [], [], []
+            cortes_cabezal, cortes_zoclo, cortes_intermedio, cortes_mosquitero = [], [], [], []
             todos_los_vidrios_prov = []
             lista_medidas = []
 
