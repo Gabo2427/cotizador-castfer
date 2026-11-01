@@ -164,7 +164,7 @@ class Ventana:
             filas_locales = 3
 
         largo_vertical = alto_hoja - self.perfil_zoclo - self.perfil_cabezal
-        largo_horizontal = ancho_hoja
+        largo_horizontal = ancho_hoja - (self.perfil_cerco_traslape * 2)
         
         num_vert = cols_locales - 1
         num_horz = filas_locales - 1
